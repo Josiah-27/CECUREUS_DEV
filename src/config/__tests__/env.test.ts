@@ -38,6 +38,16 @@ describe('parseEnv', () => {
     expect(() => parseEnv({ ...local, EXPO_PUBLIC_APP_ENV: 'preview' })).toThrow(/https/);
   });
 
+  it('allows http to a PC on the local Wi-Fi only in development', () => {
+    for (const host of ['192.168.1.20', '10.0.0.5', '172.16.4.2']) {
+      const lan = { ...base, EXPO_PUBLIC_API_BASE_URL: `http://${host}:4000/v1` };
+      expect(parseEnv(lan).apiBaseUrl).toBe(`http://${host}:4000/v1`);
+      expect(() => parseEnv({ ...lan, EXPO_PUBLIC_APP_ENV: 'production' })).toThrow(/https/);
+    }
+    expect(() => parseEnv({ ...base, EXPO_PUBLIC_API_BASE_URL: 'http://8.8.8.8:4000' })).toThrow(/https/);
+    expect(() => parseEnv({ ...base, EXPO_PUBLIC_API_BASE_URL: 'http://172.32.0.1:4000' })).toThrow(/https/);
+  });
+
   it('rejects an unknown app env', () => {
     expect(() => parseEnv({ ...base, EXPO_PUBLIC_APP_ENV: 'staging' })).toThrow(EnvError);
   });

@@ -30,6 +30,8 @@ type RawEnv = {
 };
 
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '10.0.2.2'];
+/** Private LAN ranges, so a phone on the same Wi-Fi can reach a dev mock server on the PC. */
+const PRIVATE_LAN = /^(10\.\d+|192\.168|172\.(1[6-9]|2\d|3[01]))\.\d+\.\d+$/;
 
 function validateUrl(name: string, value: string | undefined, appEnv: AppEnv['appEnv']): string {
   if (!value) throw new EnvError(`${name} is not set`);
@@ -39,7 +41,7 @@ function validateUrl(name: string, value: string | undefined, appEnv: AppEnv['ap
   } catch {
     throw new EnvError(`${name} is not a valid URL`);
   }
-  const isLocal = LOCAL_HOSTS.includes(url.hostname);
+  const isLocal = LOCAL_HOSTS.includes(url.hostname) || PRIVATE_LAN.test(url.hostname);
   if (url.protocol !== 'https:' && !(appEnv === 'development' && isLocal)) {
     throw new EnvError(`${name} must use https`);
   }
