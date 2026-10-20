@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { setUnauthorizedHandler } from '@/api';
-import type { OtpRequest, User, UserType } from '@/api/schemas';
+import type { AuthSession, RegistrationDetails, User } from '@/api/schemas';
 import { useApi } from '@/providers/api-provider';
 
 import { sessionStore } from './session-store';
@@ -13,8 +13,10 @@ type AuthContextValue = {
   user: User | null;
   /** Set when the user was signed out because the server rejected the session. */
   sessionExpired: boolean;
-  requestOtp: (email: string, userType: UserType) => Promise<OtpRequest>;
-  verifyOtp: (requestId: string, email: string, otp: string) => Promise<void>;
+  /** Sign in with a user ID (email, mobile or employee ID) and password. */
+  signIn: (userId: string, password: string) => Promise<void>;
+  /** Final sign-up step (after email + mobile OTP verification); signs the new user in. */
+  completeRegistration: (registrationToken: string, details: RegistrationDetails) => Promise<void>;
   updateUser: (user: User) => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -52,20 +54,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [clearLocal]);
 
-  const requestOtp = useCallback(
-    (email: string, userType: UserType) => api.auth.requestOtp(email.trim().toLowerCase(), userType),
-    [api],
+  const startSession = useCallback(async (session: AuthSession) => {
+    await sessionStore.save(session);
+    setUser(session.user);
+    setSessionExpired(false);
+    setStatus('signedIn');
+  }, []);
+
+  const signIn = useCallback(
+    async (userId: string, password: string) => startSession(await api.auth.login(userId.trim(), password)),
+    [api, startSession],
   );
 
-  const verifyOtp = useCallback(
-    async (requestId: string, email: string, otp: string) => {
-      const session = await api.auth.verifyOtp(requestId, email.trim().toLowerCase(), otp);
-      await sessionStore.save(session);
-      setUser(session.user);
-      setSessionExpired(false);
-      setStatus('signedIn');
-    },
-    [api],
+  const completeRegistration = useCallback(
+    async (registrationToken: string, details: RegistrationDetails) =>
+      startSession(await api.auth.register.complete(registrationToken, details)),
+    [api, startSession],
   );
 
   const updateUser = useCallback(async (next: User) => {
@@ -84,8 +88,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [api, clearLocal]);
 
   const value = useMemo(
-    () => ({ status, user, sessionExpired, requestOtp, verifyOtp, updateUser, signOut }),
-    [status, user, sessionExpired, requestOtp, verifyOtp, updateUser, signOut],
+    () => ({ status, user, sessionExpired, signIn, completeRegistration, updateUser, signOut }),
+    [status, user, sessionExpired, signIn, completeRegistration, updateUser, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

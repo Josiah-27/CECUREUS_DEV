@@ -56,6 +56,8 @@ export const userSchema = z.object({
   userType: userTypeSchema,
   companyName: optionalText,
   sessionsRemaining: optionalNumber,
+  /** employee_list.emp_age — optional, set from Edit Profile. */
+  age: optionalNumber,
 });
 export type User = z.infer<typeof userSchema>;
 
@@ -65,6 +67,18 @@ export const authSessionSchema = z.object({
   user: userSchema,
 });
 export type AuthSession = z.infer<typeof authSessionSchema>;
+
+/** Proof that the sign-up email was verified; required for the next registration steps. */
+export const registrationSchema = z.object({ registrationToken: z.string().min(1) });
+export type Registration = z.infer<typeof registrationSchema>;
+
+export type RegistrationDetails = {
+  firstName: string;
+  lastName: string | null;
+  password: string;
+  /** Corporate only: employee ID (employee_list.emp_companyid), usable as a sign-in ID. */
+  employeeId: string | null;
+};
 
 // ---------- Reference data ----------
 

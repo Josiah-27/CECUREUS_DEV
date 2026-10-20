@@ -5,7 +5,8 @@
  *   npm run mock-api            # http://localhost:4000/v1
  *   EXPO_PUBLIC_API_BASE_URL=http://localhost:4000/v1 npm run web
  *
- * Login with any email; the OTP is always 123456.
+ * Sign up with any email (OTP is always 123456), or sign in with the demo account
+ * harsha.verma@example.com / Harsha@123.
  */
 import http from 'node:http';
 
@@ -13,7 +14,7 @@ const PORT = Number(process.env.MOCK_API_PORT ?? 4000);
 process.env.EXPO_PUBLIC_API_BASE_URL = `http://localhost:${PORT}/v1`;
 
 const { createMockServer } = await import('../src/test/mock-server.ts');
-const mock = createMockServer();
+const mock = createMockServer({ seedDemoAccount: true });
 
 const HEADER_CASE = { authorization: 'Authorization', 'idempotency-key': 'Idempotency-Key', 'content-type': 'Content-Type' };
 const CORS = {

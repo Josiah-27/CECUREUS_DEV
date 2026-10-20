@@ -14,10 +14,12 @@ import { AuthProvider, useAuth } from '@/auth/auth-provider';
 import { DemoBadge } from '@/components/demo-badge';
 import { AppText } from '@/components/ui';
 import { getEnv } from '@/config/env';
+import { installWebAlertShim } from '@/lib/web-alert-shim';
 import { ApiProvider } from '@/providers/api-provider';
 import { colors, spacing } from '@/theme';
 
 void SplashScreen.preventAutoHideAsync();
+installWebAlertShim();
 
 function RootNavigator() {
   const { status } = useAuth();

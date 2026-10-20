@@ -33,7 +33,13 @@ development; release builds use EAS.
 ### Demo mode on your phone (no backend needed)
 
 Set `EXPO_PUBLIC_DEMO_MODE=true` in `.env.local`, run `npx expo start -c`, and scan the QR code with Expo Go
-(SDK 57). The app uses a built-in fake backend on the phone: login with any email and code `123456`.
+(SDK 57). The app uses a built-in fake backend on the phone (stored on the device, survives reloads):
+
+- **Get Started** → corporate or individual → email (code `123456`) → mobile (code `123456`) → name → password.
+  Corporate sign-up needs a work email at a registered demo organisation: `@fixturecorp.com` or `@democorp.com`.
+- **I already have an account** → user ID (email, mobile or employee ID) + password.
+  Demo account: `harsha.verma@example.com` (or `98765 43210`) / `Harsha@123`.
+
 A small "DEMO · sample data" badge is shown. Demo mode is refused outside development builds.
 
 ### Preview the UI without a backend or Android device

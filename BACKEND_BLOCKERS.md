@@ -8,7 +8,7 @@ real CecureUs backend.** Mock-tested ≠ production-ready.
 |----|---------|---------|-----------------|
 | B-00 | **Security** | Public `/api/{table}` endpoint leaks counsellor password hashes, OTPs, bank & PAN data | **YES — fix immediately** |
 | B-01 | All | Mobile API base URL, auth scheme and confirmation of the contract | **YES** |
-| B-02 | Login | Email OTP request/verify endpoints (10-min expiry, cooldown, lockout) | **YES** |
+| B-02 | Sign-up / sign-in | Registration (email OTP → mobile OTP → details) and password login endpoints | **YES** |
 | B-03 | Login | Corporate eligibility rules (domain / employee list / company status) | **YES** |
 | B-04 | Counsellors | Sanitised counsellor list/detail endpoints | **YES** |
 | B-05 | Calendar | Availability endpoint (slots computed server-side) | **YES** |
@@ -22,6 +22,8 @@ real CecureUs backend.** Mock-tested ≠ production-ready.
 | B-13 | Account | Profile update + account deletion endpoints | **YES** (Play policy) |
 | B-14 | Individuals | Booking policy for individual users with payments excluded | **YES (product decision)** |
 | B-15 | Legal | Privacy policy & terms URLs, data deletion web page | **YES** (Play policy) |
+| B-16 | Accounts | Confirm meaning of `employee_list.emp_role` and existing password hashing | **YES** |
+| B-17 | Accounts | Password reset (forgot password) flow | No (support email for now) |
 
 ---
 
@@ -40,10 +42,13 @@ real CecureUs backend.** Mock-tested ≠ production-ready.
   accounts available for integration testing?
 - **Temporary strategy:** Mock server + `EXPO_PUBLIC_API_BASE_URL`.
 
-### B-02 — Email OTP
-- **Question:** Which email provider sends the OTP? Can you confirm server-side 10-minute expiry, single use,
-  60 s resend cooldown, 5-attempt lockout, rate limiting, and that OTPs are hashed and never logged?
-  Is SMS OTP required for login, or only email? (Currently email only.)
+### B-02 — Sign-up and sign-in
+- **Implemented in the app** against `docs/API_CONTRACT.md` §1 using only existing `employee_list` columns
+  (verified by a test that the stored row has exactly the table's columns).
+- **Question:** Which email provider sends the sign-up code and which SMS route (SMS Integra) sends the mobile code?
+  Can you confirm server-side 10-minute expiry, 60 s resend cooldown, 5-attempt lockout, OTPs stored hashed in
+  `emp_otp`, and login lockout after 5 failures? Do existing users (already in `employee_list`) have passwords, or
+  do they need a one-time "set password" step?
 
 ### B-03 — Corporate eligibility
 - **Question:** How is a corporate user verified — email domain whitelist per company, pre-loaded `employee_list`,
@@ -92,3 +97,13 @@ real CecureUs backend.** Mock-tested ≠ production-ready.
 ### B-15 — Legal pages
 - **Question:** Confirm the privacy policy and terms URLs (placeholders: `https://cecureus.com/privacy-policy`,
   `https://cecureus.com/terms`). They must be live before Play submission.
+
+### B-16 — `employee_list` semantics
+- **Question:** The app stores corporate/individual in `emp_role` ('corporate' / 'individual'). Is that the right
+  column, or do `emp_option` / `position` already mean something else? What values does `status` use today
+  (the app uses 'pending' during sign-up, 'active', 'deleted')? How are current `emp_password` values hashed?
+  (They should be migrated to bcrypt/argon2id.)
+
+### B-17 — Password reset
+- **Question:** Phase 1 shows "email support to reset your password". Should we add a reset flow
+  (OTP to verified email or mobile → new password)? It fits the same table without schema changes.

@@ -64,7 +64,7 @@ export default function WelcomeScreen() {
           testID="have-account"
           variant="ghost"
           label="I already have an account"
-          onPress={() => router.push('/choose')}
+          onPress={() => router.push('/sign-in')}
         />
       </View>
     </Screen>

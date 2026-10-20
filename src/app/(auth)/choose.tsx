@@ -30,7 +30,7 @@ function Choice({
     <Card
       testID={testID}
       accessibilityLabel={`${title}. ${subtitle}`}
-      onPress={() => router.push({ pathname: '/login', params: { userType } })}
+      onPress={() => router.push({ pathname: '/register', params: { userType } })}
     >
       <View style={styles.row}>
         <View style={[styles.icon, { backgroundColor: `${tint}22` }]}>
@@ -69,7 +69,7 @@ export default function ChooseUserTypeScreen() {
       <Choice
         testID="choose-individual"
         title="I am an Individual"
-        subtitle="Sign in with your personal email."
+        subtitle="Create an account with your email and mobile number."
         Icon={User}
         tint={colors.amber}
         userType="individual"

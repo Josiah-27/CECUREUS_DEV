@@ -1,42 +1,42 @@
-import { useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ApiError, friendlyMessage } from '@/api/errors';
-import { userTypeSchema } from '@/api/schemas';
-import { useAuth } from '@/auth/auth-provider';
-import { AppText, Button, Screen } from '@/components/ui';
+import type { OtpRequest } from '@/api/schemas';
 import { OTP_LENGTH } from '@/config/constants';
 import { useCountdown } from '@/hooks/use-countdown';
 import { formatClock } from '@/lib/breathing';
 import { sanitizeOtp, validateOtp } from '@/lib/validation';
 import { colors, radius, spacing } from '@/theme';
 
-function toSeconds(value: string | undefined, fallback: number) {
-  const n = Number(value);
-  return Number.isFinite(n) && n >= 0 ? n : fallback;
-}
+import { AppText, Button } from './ui';
 
-export default function VerifyScreen() {
-  const params = useLocalSearchParams<{
-    email: string;
-    userType: string;
-    requestId: string;
-    expiresIn: string;
-    resendAfter: string;
-  }>();
-  const userType = userTypeSchema.catch('individual').parse(params.userType);
-  const email = params.email ?? '';
-  const { verifyOtp, requestOtp } = useAuth();
+type Props = {
+  /** Where the code was sent, e.g. "you@example.com" or "+91 98765 43210". */
+  destination: string;
+  initial: OtpRequest;
+  /** Verifies the code against `requestId`; throws ApiError on failure. */
+  onVerify: (requestId: string, code: string) => Promise<void>;
+  /** Requests a fresh code. */
+  onResend: () => Promise<OtpRequest>;
+  /** "Change email" / "Change number". */
+  onChangeDestination: () => void;
+  changeLabel: string;
+};
 
-  const [requestId, setRequestId] = useState(params.requestId ?? '');
+/**
+ * Six-digit OTP entry with server-driven expiry and resend cooldown.
+ * Used for both email and mobile verification during sign-up.
+ */
+export function OtpEntry({ destination, initial, onVerify, onResend, onChangeDestination, changeLabel }: Props) {
+  const [requestId, setRequestId] = useState(initial.requestId);
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
   const [resending, setResending] = useState(false);
-  const expiry = useCountdown(toSeconds(params.expiresIn, 600));
-  const resend = useCountdown(toSeconds(params.resendAfter, 60));
+  const expiry = useCountdown(initial.expiresInSeconds);
+  const resend = useCountdown(initial.resendAfterSeconds);
   const inputRef = useRef<TextInput>(null);
   const expired = expiry.remaining === 0;
 
@@ -49,15 +49,14 @@ export default function VerifyScreen() {
     setError(null);
     setVerifying(true);
     try {
-      // On success the auth guard swaps to the signed-in app automatically.
-      await verifyOtp(requestId, email, value);
+      await onVerify(requestId, value);
     } catch (e) {
       setCode('');
-      if (e instanceof ApiError && e.code === 'OTP_EXPIRED') {
-        setError('This code has expired. Please request a new one.');
-      } else {
-        setError(friendlyMessage(e));
-      }
+      setError(
+        e instanceof ApiError && e.code === 'OTP_EXPIRED'
+          ? 'This code has expired. Please request a new one.'
+          : friendlyMessage(e),
+      );
       setVerifying(false);
     }
   }
@@ -67,17 +66,15 @@ export default function VerifyScreen() {
     setError(null);
     setNotice(null);
     try {
-      const otp = await requestOtp(email, userType);
+      const otp = await onResend();
       setRequestId(otp.requestId);
       expiry.restart(otp.expiresInSeconds);
       resend.restart(otp.resendAfterSeconds);
       setCode('');
-      setNotice('A new code has been sent to your email.');
+      setNotice('A new code has been sent.');
       inputRef.current?.focus();
     } catch (e) {
-      if (e instanceof ApiError && e.kind === 'rate_limited' && e.retryAfterSeconds) {
-        resend.restart(e.retryAfterSeconds);
-      }
+      if (e instanceof ApiError && e.kind === 'rate_limited' && e.retryAfterSeconds) resend.restart(e.retryAfterSeconds);
       setError(friendlyMessage(e));
     } finally {
       setResending(false);
@@ -85,13 +82,10 @@ export default function VerifyScreen() {
   }
 
   return (
-    <Screen edges={['bottom']}>
-      <View style={styles.header}>
-        <AppText variant="display">Enter code</AppText>
-        <AppText color={colors.textMuted}>
-          We sent a {OTP_LENGTH}-digit code to <AppText variant="bodyStrong">{email}</AppText>
-        </AppText>
-      </View>
+    <View style={styles.wrap}>
+      <AppText color={colors.textMuted}>
+        We sent a {OTP_LENGTH}-digit code to <AppText variant="bodyStrong">{destination}</AppText>
+      </AppText>
 
       <Pressable onPress={() => inputRef.current?.focus()} accessible={false}>
         <View style={styles.boxes} aria-hidden>
@@ -152,12 +146,13 @@ export default function VerifyScreen() {
         disabled={resend.remaining > 0}
         loading={resending}
       />
-    </Screen>
+      <Button testID="change-destination" variant="ghost" compact label={changeLabel} onPress={onChangeDestination} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { gap: spacing.sm },
+  wrap: { gap: spacing.lg },
   boxes: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
   box: {
     flex: 1,
@@ -168,8 +163,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.background,
   },
-  boxActive: { borderColor: colors.primary },
+  boxActive: { borderColor: colors.teal },
   boxError: { borderColor: colors.danger },
   hiddenInput: { position: 'absolute', opacity: 0, height: 1, width: 1 },
 });

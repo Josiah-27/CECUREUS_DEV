@@ -23,6 +23,14 @@ Added: article read history ("Blogs Completed"), bookmarks, side menu, notificat
 Icons are imported per-file (full Lucide index grew the Android bundle 3.2 → 5.5 MB; now 3.4 MB).
 Jest capped at 50% workers (8 GB RAM machine was swapping with 11 workers).
 
+## Accounts update (sign-up / sign-in)
+- **Get Started** → corporate or individual → **email OTP → mobile OTP → name (+ optional employee ID) → password**
+  → account created and signed in. **I already have an account** → user ID (email, mobile or employee ID) + password.
+- **Edit Profile** adds **Age** (optional, 18–100, `emp_age`); email and mobile are read-only (verified at sign-up).
+- Uses the existing `employee_list` table only — no columns added (test-enforced). See API_CONTRACT §1.
+- Demo mode keeps its fake database on the device and seeds a demo account.
+- Replaces the earlier email-OTP-only login. Tests: 141 passing.
+
 ## Module status
 
 | # | Module | State | Notes |

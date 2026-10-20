@@ -24,47 +24,69 @@ The contract below exposes only the fields the app needs, behind authentication.
   - `message` must be safe to show users (it is displayed for 400/409/422). Never include SQL/stack traces.
   - HTTP status codes: 400/422 validation, 401 not authenticated / session expired, 403 forbidden,
     404 not found, 409 conflict (e.g. slot taken), 429 rate limited (send `Retry-After` seconds), 5xx server error.
-- Auth: `Authorization: Bearer <accessToken>` on every endpoint except `auth/otp/*`, `issues`, `languages`.
+- Auth: `Authorization: Bearer <accessToken>` on every endpoint except `auth/login`, `auth/register/*`, `issues`, `languages`.
 - IDs may be strings or numbers (the app normalises to strings).
 - Timestamps: ISO-8601 with offset, e.g. `2026-11-02T10:00:00+05:30`. Dates: `YYYY-MM-DD`.
 - Every user-scoped endpoint must enforce **server-side authorisation**: a user can only read/modify their own data.
 
-## 1. Authentication (email OTP)
+## 1. Accounts — sign-up and sign-in (uses the existing `employee_list` table, no schema change)
 
-### `POST /auth/otp/request`
-Request: `{ "email": "name@company.com", "userType": "corporate" | "individual" }`
+**Column mapping.** No columns are added or renamed; values are strings as in the dump.
 
-Response `data`: `{ "requestId": "abc123", "expiresInSeconds": 600, "resendAfterSeconds": 60 }`
+| Field | `employee_list` column | Notes |
+|-------|------------------------|-------|
+| Account ID | `emp_id` | int primary key |
+| Email (user ID) | `emp_email` | lower-cased, unique among `status='active'` rows |
+| Mobile (user ID) | `emp_mobile` | E.164 `+91XXXXXXXXXX`, unique among active rows |
+| Employee ID (corporate user ID, optional) | `emp_companyid` | unique within the company |
+| Password | `emp_password` | **bcrypt/argon2id hash** (the dump looks like unsalted MD5 — rehash on next login) |
+| First / last name | `emp_name` / `emp_lname` | |
+| Age | `emp_age` | `''` when not set |
+| Corporate or individual | `emp_role` | `'corporate'` / `'individual'` — **please confirm this column's meaning** (B-16) |
+| Company | `emp_companyname`, `emp_organisationname` | set by the server from the work-email domain |
+| Current OTP | `emp_otp` | store a **hash**; one column is enough because email and mobile are verified one after the other |
+| Lifecycle | `status` | `'pending'` during sign-up → `'active'` → `'deleted'` |
+| Timestamps | `created_at`, `updated_at`, `reg_date` | legacy format `DD-MM-YYYY hh:mm:ss AM` |
 
-Server rules (**must be enforced server-side**):
-- Generate a cryptographically random 6-digit OTP; store only a hash; valid for **10 minutes**.
-- Resend cooldown (proposed 60 s) → `429` with `code: OTP_COOLDOWN` and `Retry-After`.
-- Per-email and per-IP rate limits.
-- For `corporate`: verify the email domain / employee record belongs to a registered, active company
-  (`organization`, `employee_list`). If not: `422` with a clear `message` (e.g. `code: COMPANY_NOT_REGISTERED`).
-- Do not reveal whether an individual account already exists.
-- Send the email via the approved provider. **Never return the OTP in the response or logs.**
+OTP issue time, attempt counts, registration tokens and login-failure counters are short-lived server state
+(cache/session store), not table columns.
 
-### `POST /auth/otp/verify`
-Request: `{ "requestId": "abc123", "email": "name@company.com", "otp": "123456" }`
+**User ID.** The table has no username column, so a user signs in with **any** of: email, mobile number, or
+(corporate) employee ID, plus their password.
 
-Response `data`:
-```json
-{
-  "accessToken": "opaque-or-JWT",
-  "expiresAt": "2026-12-01T00:00:00+05:30",
-  "user": { /* User, see §2 */ }
-}
-```
-Errors: `422 OTP_INVALID`, `422 OTP_EXPIRED`, `429 OTP_LOCKED` (after 5 wrong attempts the OTP is invalidated).
-OTP is single-use. Creates the user record on first successful verification (individual users).
+### Sign-up flow (each step must succeed before the next)
 
-### `POST /auth/logout`
-Revokes the access token server-side. Response `data`: `null`.
+1. `POST /auth/register/email/request` — `{ "email", "userType": "corporate" | "individual" }`
+   → `{ "requestId", "expiresInSeconds": 600, "resendAfterSeconds": 60 }`.
+   Creates (or reuses) a `status='pending'` row, stores the OTP in `emp_otp`, emails the code.
+   Errors: `409 EMAIL_TAKEN` (active account exists), `422 COMPANY_NOT_REGISTERED` (corporate domain not on file),
+   `429 OTP_COOLDOWN` with `Retry-After`.
+2. `POST /auth/register/email/verify` — `{ "requestId", "otp" }` → `{ "registrationToken" }`.
+   Errors: `422 OTP_INVALID`, `422 OTP_EXPIRED` (10 minutes), `429 OTP_LOCKED` (5 wrong attempts).
+3. `POST /auth/register/phone/request` — `{ "registrationToken", "mobile" }` → `{ "requestId", … }`.
+   Saves `emp_mobile` on the pending row, stores a new OTP in `emp_otp`, sends it by SMS.
+   Errors: `422 INVALID_MOBILE`, `409 MOBILE_TAKEN`, `429 OTP_COOLDOWN`, `422 REGISTRATION_EXPIRED`.
+4. `POST /auth/register/phone/verify` — `{ "registrationToken", "requestId", "otp" }` → `null`.
+5. `POST /auth/register/complete` — `{ "registrationToken", "firstName", "lastName" | null, "password", "employeeId" | null }`
+   → `201` AuthSession (signed in). Sets name, password hash, `emp_companyid`, `reg_date`, `status='active'`,
+   clears `emp_otp`. Errors: `422 VERIFICATION_REQUIRED` (email and mobile not both verified),
+   `422 WEAK_PASSWORD` (min 8, letter + number), `409 EMPLOYEE_ID_TAKEN`.
+
+### Sign in
+
+`POST /auth/login` — `{ "userId": "<email | mobile | employee ID>", "password" }` → AuthSession.
+- Wrong user ID **or** wrong password → the same `422 INVALID_CREDENTIALS` "Incorrect user ID or password."
+  (never reveal which accounts exist).
+- 5 failures → `429 LOGIN_LOCKED` for 15 minutes (with `Retry-After`).
+- Only `status='active'` rows can sign in.
+
+**AuthSession** = `{ "accessToken", "expiresAt", "user": User }`. `POST /auth/logout` revokes the token.
+
+Password reset is not part of Phase 1 (the app points users to support) — see B-17.
 
 ## 2. Profile
 
-**User object**
+**User object** (from `employee_list`; never includes `emp_password` or `emp_otp`)
 ```json
 {
   "id": "101",
@@ -74,16 +96,18 @@ Revokes the access token server-side. Response `data`: `null`.
   "mobile": "+919876543210",
   "userType": "corporate",
   "companyName": "Hyundai",
-  "sessionsRemaining": 4
+  "sessionsRemaining": 4,
+  "age": 29
 }
 ```
-Maps from `employee_list`: `emp_id`, `emp_name`, `emp_lname`, `emp_email`, `emp_mobile`, `emp_companyname`.
 `sessionsRemaining` comes from the corporate entitlement (per-company policy; `null` for individuals).
 
 - `GET /me` → User
-- `PATCH /me` — body `{ "firstName", "lastName" | null, "mobile" | null }` → updated User. Validate server-side.
+- `PATCH /me` — body `{ "firstName", "lastName" | null, "age": 18–100 | null }` → updated User
+  (`emp_name`, `emp_lname`, `emp_age`). Email and mobile are verified at sign-up and are not editable here.
+  Errors: `422 VALIDATION`, `422 INVALID_AGE`.
 - `DELETE /me` — account deletion request (Google Play requirement). Cancels future bookings, deletes or
-  anonymises personal data per the privacy policy, revokes all tokens. Response `data`: `null`.
+  anonymises personal data per the privacy policy (`status='deleted'`), revokes all tokens. Response `data`: `null`.
 
 ## 3. Reference data (public)
 

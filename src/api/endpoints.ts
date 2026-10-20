@@ -19,8 +19,10 @@ import {
   okSchema,
   otpRequestSchema,
   pageSchema,
+  registrationSchema,
   userSchema,
   videoSchema,
+  type RegistrationDetails,
   type SessionMode,
   type UserType,
 } from './schemas';
@@ -28,24 +30,51 @@ import {
 export function createEndpoints(client: ApiClient) {
   return {
     auth: {
-      requestOtp: (email: string, userType: UserType) =>
-        client.request('auth/otp/request', otpRequestSchema, {
+      /** Sign in with a user ID (email, mobile number or employee ID) and password. */
+      login: (userId: string, password: string) =>
+        client.request('auth/login', authSessionSchema, {
           method: 'POST',
           auth: false,
-          body: { email, userType },
-        }),
-      verifyOtp: (requestId: string, email: string, otp: string) =>
-        client.request('auth/otp/verify', authSessionSchema, {
-          method: 'POST',
-          auth: false,
-          body: { requestId, email, otp },
+          body: { userId, password },
         }),
       logout: () => client.request('auth/logout', okSchema, { method: 'POST' }),
+      register: {
+        requestEmailOtp: (email: string, userType: UserType) =>
+          client.request('auth/register/email/request', otpRequestSchema, {
+            method: 'POST',
+            auth: false,
+            body: { email, userType },
+          }),
+        verifyEmailOtp: (requestId: string, otp: string) =>
+          client.request('auth/register/email/verify', registrationSchema, {
+            method: 'POST',
+            auth: false,
+            body: { requestId, otp },
+          }),
+        requestPhoneOtp: (registrationToken: string, mobile: string) =>
+          client.request('auth/register/phone/request', otpRequestSchema, {
+            method: 'POST',
+            auth: false,
+            body: { registrationToken, mobile },
+          }),
+        verifyPhoneOtp: (registrationToken: string, requestId: string, otp: string) =>
+          client.request('auth/register/phone/verify', okSchema, {
+            method: 'POST',
+            auth: false,
+            body: { registrationToken, requestId, otp },
+          }),
+        complete: (registrationToken: string, details: RegistrationDetails) =>
+          client.request('auth/register/complete', authSessionSchema, {
+            method: 'POST',
+            auth: false,
+            body: { registrationToken, ...details },
+          }),
+      },
     },
 
     profile: {
       get: () => client.request('me', userSchema),
-      update: (patch: { firstName: string; lastName: string | null; mobile: string | null }) =>
+      update: (patch: { firstName: string; lastName: string | null; age: number | null }) =>
         client.request('me', userSchema, { method: 'PATCH', body: patch }),
       requestDeletion: () => client.request('me', okSchema, { method: 'DELETE' }),
     },

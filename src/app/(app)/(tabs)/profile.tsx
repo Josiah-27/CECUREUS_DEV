@@ -79,6 +79,9 @@ export default function ProfileScreen() {
                 {user.mobile}
               </AppText>
             ) : null}
+            <AppText variant="caption" color={colors.textMuted} testID="profile-age">
+              {user.age != null ? `Age ${user.age}` : 'Age not set · add it in Edit Profile'}
+            </AppText>
             <View style={styles.verified}>
               <BadgeCheck size={13} color={colors.teal} />
               <AppText variant="micro" color={colors.primary}>

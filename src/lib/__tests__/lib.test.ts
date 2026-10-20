@@ -2,7 +2,16 @@ import { BREATHING_EXERCISES, findExercise, formatClock, phaseAt } from '../brea
 import { addDays, googleCalendarUrl, isPast, parseYmd, toYmd } from '../date';
 import { htmlToParagraphs } from '../html';
 import { currentStreak } from '../streak';
-import { normalizeIndianMobile, sanitizeOtp, validateEmail, validateName, validateOtp } from '../validation';
+import {
+  normalizeIndianMobile,
+  parseAge,
+  sanitizeOtp,
+  validateEmail,
+  validateEmployeeId,
+  validateName,
+  validateOtp,
+  validatePassword,
+} from '../validation';
 
 describe('validation', () => {
   it('validates emails', () => {
@@ -32,6 +41,29 @@ describe('validation', () => {
     expect(validateName('ஹர்ஷா')).toBeNull();
     expect(validateName('')).toMatch(/required/);
     expect(validateName('<script>')).toMatch(/invalid/);
+  });
+});
+
+describe('account validation', () => {
+  it('requires passwords of 8+ characters with a letter and a number', () => {
+    expect(validatePassword('Secret123')).toBeNull();
+    expect(validatePassword('Ab1')).toMatch(/at least 8/);
+    expect(validatePassword('abcdefgh')).toMatch(/letter and one number/);
+    expect(validatePassword('12345678')).toMatch(/letter and one number/);
+  });
+
+  it('parses an optional adult age', () => {
+    expect(parseAge('')).toEqual({ value: null, error: null });
+    expect(parseAge(' 29 ')).toEqual({ value: 29, error: null });
+    expect(parseAge('17').error).toMatch(/18 or older/);
+    expect(parseAge('101').error).toMatch(/between 18 and 100/);
+    expect(parseAge('2x').error).toMatch(/whole years/);
+  });
+
+  it('validates optional employee IDs', () => {
+    expect(validateEmployeeId('')).toBeNull();
+    expect(validateEmployeeId('FC-1042')).toBeNull();
+    expect(validateEmployeeId('a b')).not.toBeNull();
   });
 });
 

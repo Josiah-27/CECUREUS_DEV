@@ -13,6 +13,9 @@ export default function AuthLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="choose" options={{ title: 'Get started' }} />
+      <Stack.Screen name="sign-in" options={{ title: 'Sign in' }} />
+      <Stack.Screen name="register" options={{ title: 'Create account' }} />
     </Stack>
   );
 }

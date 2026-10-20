@@ -17,11 +17,29 @@ export function setUnauthorizedHandler(handler: (() => void) | null) {
  * The check reads process.env directly so production builds, where the variable is
  * unset, compile the branch away and never bundle the mock server.
  */
+const DEMO_DB_KEY = 'cecureus.demo.db.v1';
+
 function demoFetch(baseUrl: string): typeof fetch | undefined {
   if (process.env.EXPO_PUBLIC_DEMO_MODE === 'true' && process.env.EXPO_PUBLIC_APP_ENV === 'development') {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { createMockServer } = require('@/test/mock-server') as typeof import('@/test/mock-server');
-    return createMockServer({ baseUrl }).fetch;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { readJson, writeJson } = require('@/local/secure-json-store') as typeof import('@/local/secure-json-store');
+    const server = createMockServer({ baseUrl, seedDemoAccount: true });
+    // Keep demo accounts, sessions and bookings across app reloads (stored on this device only).
+    const ready = readJson<ReturnType<typeof server.snapshot> | null>(DEMO_DB_KEY, null)
+      .then((snap) => {
+        if (snap) server.restore(snap);
+      })
+      .catch(() => undefined);
+    return (async (input, init) => {
+      await ready;
+      const response = await server.fetch(input, init);
+      if ((init?.method ?? 'GET').toUpperCase() !== 'GET') {
+        void writeJson(DEMO_DB_KEY, server.snapshot()).catch(() => undefined);
+      }
+      return response;
+    }) as typeof fetch;
   }
   return undefined;
 }

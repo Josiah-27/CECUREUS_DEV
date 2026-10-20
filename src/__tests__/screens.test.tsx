@@ -72,21 +72,37 @@ describe('counsellor directory', () => {
 });
 
 describe('profile', () => {
-  it('edits the profile with validation', async () => {
+  it('edits name and age (stored in employee_list.emp_age) with validation', async () => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     renderRouter(APP_DIR, { initialUrl: '/edit-profile' });
-    fireEvent.changeText(await screen.findByTestId('mobile'), '12345');
+    fireEvent.changeText(await screen.findByTestId('age'), '15');
     fireEvent.press(screen.getByTestId('save-profile'));
-    expect(await screen.findByText('Enter a valid 10-digit Indian mobile number.')).toBeOnTheScreen();
+    expect(await screen.findByText('You must be 18 or older to use CecureUs.')).toBeOnTheScreen();
+    fireEvent.changeText(screen.getByTestId('age'), '130');
+    fireEvent.press(screen.getByTestId('save-profile'));
+    expect(await screen.findByText('Enter an age between 18 and 100.')).toBeOnTheScreen();
     expect(server.state.calls.some((c) => c.method === 'PATCH')).toBe(false);
 
     fireEvent.changeText(screen.getByTestId('first-name'), 'Harshini');
-    fireEvent.changeText(screen.getByTestId('mobile'), '98765 43210');
+    fireEvent.changeText(screen.getByTestId('age'), '29');
     fireEvent.press(screen.getByTestId('save-profile'));
     await waitFor(() => expect(alert).toHaveBeenCalledWith('Profile updated', expect.any(String)));
     const patch = server.state.calls.find((c) => c.method === 'PATCH');
-    expect(patch?.body).toEqual({ firstName: 'Harshini', lastName: 'Verma', mobile: '+919876543210' });
-    expect((await sessionStore.load())?.user.firstName).toBe('Harshini');
+    expect(patch?.body).toEqual({ firstName: 'Harshini', lastName: 'Verma', age: 29 });
+    expect((await sessionStore.load())?.user).toMatchObject({ firstName: 'Harshini', age: 29 });
+    const row = server.state.employee_list.find((r) => r.emp_email === 'harsha@fixturecorp.com')!;
+    expect(row).toMatchObject({ emp_name: 'Harshini', emp_age: '29' });
+  });
+
+  it('adds an age from the profile screen and shows it after saving', async () => {
+    jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    renderRouter(APP_DIR, { initialUrl: '/profile' });
+    expect(await screen.findByTestId('profile-age')).toHaveTextContent(/Age not set/);
+    fireEvent.press(screen.getByLabelText('Edit Profile'));
+    fireEvent.changeText(await screen.findByTestId('age'), '41');
+    fireEvent.press(screen.getByTestId('save-profile'));
+    expect(await screen.findByText('Age 41')).toBeOnTheScreen();
+    expect(server.state.employee_list[0].emp_age).toBe('41');
   });
 
   it('deletes the account: server request, local data wiped, signed out', async () => {

@@ -105,13 +105,13 @@ describe('createApiClient', () => {
 
   it('maps HTTP status codes and carries server code and Retry-After', async () => {
     const { client, server } = setup(null);
-    await client.request('auth/otp/request', z.unknown(), {
+    await client.request('auth/register/email/request', z.unknown(), {
       method: 'POST',
       auth: false,
       body: { email: 'a@b.co', userType: 'individual' },
     });
     const err = await catchError(
-      client.request('auth/otp/request', z.unknown(), {
+      client.request('auth/register/email/request', z.unknown(), {
         method: 'POST',
         auth: false,
         body: { email: 'a@b.co', userType: 'individual' },
