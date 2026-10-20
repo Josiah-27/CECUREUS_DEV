@@ -1,0 +1,9 @@
+appId: com.cecureus.app
+name: Emergency helpline asks before dialling
+---
+- launchApp
+- tapOn:
+    id: "emergency-banner"
+- assertVisible: "Call 1800 121 9497?"
+- tapOn: "Cancel"
+- assertVisible: "How are you feeling today?"

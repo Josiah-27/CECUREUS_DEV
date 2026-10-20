@@ -1,0 +1,18 @@
+appId: com.cecureus.app
+name: Corporate login with email OTP
+---
+- launchApp:
+    clearState: true
+- assertVisible: "I am a Corporate Employee"
+- assertVisible: "1800 121 9497"
+- tapOn: "I am a Corporate Employee"
+- tapOn:
+    id: "email-input"
+- inputText: ${TEST_EMAIL}
+- tapOn:
+    id: "send-code"
+- assertVisible: "Enter code"
+- tapOn:
+    id: "otp-input"
+- inputText: ${TEST_OTP}
+- assertVisible: "How are you feeling today?"

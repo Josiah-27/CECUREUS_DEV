@@ -1,0 +1,22 @@
+appId: com.cecureus.app
+name: Book a counsellor session (requires logged-in state from 01-login)
+---
+- launchApp
+- tapOn: "Counsellor"
+- assertVisible: "Our Counsellors"
+- tapOn:
+    text: "Book Session"
+    index: 0
+- assertVisible: "Choose Date"
+- tapOn:
+    id: "slot-.*"
+    index: 0
+- tapOn:
+    id: "mode-video"
+- tapOn:
+    id: "confirm-booking"
+- assertVisible:
+    text: "Booking Confirmed!|Booking Request Received"
+- tapOn:
+    id: "go-to-sessions"
+- assertVisible: "Upcoming.*"
