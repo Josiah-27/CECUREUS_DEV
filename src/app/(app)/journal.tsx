@@ -1,4 +1,5 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import Lock from 'lucide-react-native/icons/lock';
+import Trash2 from 'lucide-react-native/icons/trash';
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
@@ -46,7 +47,7 @@ export default function JournalScreen() {
     <Screen edges={['bottom']}>
       <Card tone="soft">
         <View style={styles.row}>
-          <Ionicons name="lock-closed" size={18} color={colors.primary} />
+          <Lock size={18} color={colors.teal} />
           <AppText variant="caption" style={styles.flex}>
             Your journal is encrypted and stored only on this device. It is never visible to counsellors, admins or your
             employer.
@@ -90,7 +91,7 @@ export default function JournalScreen() {
                   {e.mood ? ` · ${MOODS.find((m) => m.id === e.mood)?.emoji ?? ''}` : ''}
                 </AppText>
                 <Pressable accessibilityRole="button" accessibilityLabel="Delete entry" hitSlop={12} onPress={() => remove(e.id)}>
-                  <Ionicons name="trash-outline" size={20} color={colors.textMuted} />
+                  <Trash2 size={18} color={colors.textMuted} />
                 </Pressable>
               </View>
               {e.prompt ? <AppText variant="label">{e.prompt}</AppText> : null}

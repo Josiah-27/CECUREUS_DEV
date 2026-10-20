@@ -9,7 +9,7 @@ type Props = TextProps & {
 };
 
 export function AppText({ variant = 'body', color = colors.text, align, style, ...rest }: Props) {
-  const isHeading = variant === 'display' || variant === 'title' || variant === 'heading';
+  const isHeading = variant === 'display' || variant === 'title' || variant === 'heading' || variant === 'brand';
   return (
     <Text
       accessibilityRole={isHeading ? 'header' : undefined}

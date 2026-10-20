@@ -4,10 +4,10 @@ import { readJson, removeJson, writeJson } from './secure-json-store';
 
 export type Mood = 'good' | 'anxious' | 'low' | 'stressed' | 'exhausted';
 export const MOODS: { id: Mood; label: string; emoji: string; score: number }[] = [
-  { id: 'good', label: 'Good', emoji: '🙂', score: 5 },
-  { id: 'anxious', label: 'Anxious', emoji: '😟', score: 2 },
+  { id: 'good', label: 'Good', emoji: '😊', score: 5 },
+  { id: 'anxious', label: 'Anxious', emoji: '😰', score: 2 },
   { id: 'low', label: 'Low', emoji: '😔', score: 2 },
-  { id: 'stressed', label: 'Stressed', emoji: '😣', score: 1 },
+  { id: 'stressed', label: 'Stressed', emoji: '😤', score: 1 },
   { id: 'exhausted', label: 'Exhausted', emoji: '😩', score: 1 },
 ];
 
@@ -16,6 +16,15 @@ export type JournalEntry = { id: string; createdAt: string; prompt: string | nul
 export type Goal = { id: string; title: string; createdAt: string; completions: string[]; archived: boolean };
 export type ActivityLog = { id: string; exerciseId: string; completedAt: string; moodAfter: Mood | null };
 export type AssessmentLog = { assessmentId: string; title: string; completedAt: string; percentage: number; level: string };
+/** Minimal article snapshot kept for read history and bookmarks (device only). */
+export type ArticleRef = {
+  id: string;
+  title: string;
+  category: string | null;
+  readMinutes: number | null;
+  imageUrl: string | null;
+  at: string;
+};
 
 const KEYS = {
   moods: 'cecureus.local.moods',
@@ -23,6 +32,8 @@ const KEYS = {
   goals: 'cecureus.local.goals',
   activities: 'cecureus.local.activities',
   assessments: 'cecureus.local.assessments',
+  readArticles: 'cecureus.local.read-articles',
+  savedArticles: 'cecureus.local.saved-articles',
 } as const;
 
 export const MAX_JOURNAL_LENGTH = 5000;
@@ -125,6 +136,35 @@ export const assessmentLogStore = {
     return next;
   },
 };
+
+function articleRefStore(key: string) {
+  const base = collection<ArticleRef>(key);
+  return {
+    ...base,
+    async has(id: string) {
+      return (await base.all()).some((a) => a.id === id);
+    },
+    async add(article: Omit<ArticleRef, 'at'>) {
+      const rest = (await base.all()).filter((a) => a.id !== article.id);
+      const next = [{ ...article, at: new Date().toISOString() }, ...rest];
+      await base.save(next);
+      return next;
+    },
+    async remove(id: string) {
+      const next = (await base.all()).filter((a) => a.id !== id);
+      await base.save(next);
+      return next;
+    },
+    async toggle(article: Omit<ArticleRef, 'at'>) {
+      return (await this.has(article.id)) ? this.remove(article.id) : this.add(article);
+    },
+  };
+}
+
+/** Articles the user marked as read ("Blogs Completed"). */
+export const readArticleStore = articleRefStore(KEYS.readArticles);
+/** Bookmarked articles ("Save for later"). */
+export const savedArticleStore = articleRefStore(KEYS.savedArticles);
 
 /** Wipes all on-device personal data (used on account deletion). */
 export async function clearAllLocalData() {

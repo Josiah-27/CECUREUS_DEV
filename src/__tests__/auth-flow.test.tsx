@@ -15,8 +15,14 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-async function goToVerify(email = 'harsha@fixturecorp.com') {
+/** Splash → Get Started → user-type choice. */
+async function openChooser() {
   renderRouter(APP_DIR, { initialUrl: '/' });
+  fireEvent.press(await screen.findByTestId('get-started'));
+}
+
+async function goToVerify(email = 'harsha@fixturecorp.com') {
+  await openChooser();
   fireEvent.press(await screen.findByTestId('choose-corporate'));
   fireEvent.changeText(await screen.findByTestId('email-input'), email);
   fireEvent.press(screen.getByTestId('send-code'));
@@ -26,13 +32,16 @@ async function goToVerify(email = 'harsha@fixturecorp.com') {
 describe('email OTP authentication', () => {
   it('shows the welcome screen when signed out', async () => {
     renderRouter(APP_DIR, { initialUrl: '/' });
+    expect(await screen.findByTestId('get-started')).toBeOnTheScreen();
+    expect(screen.getByText('Your Mental Health Matters')).toBeOnTheScreen();
+    expect(screen.getByTestId('emergency-banner')).toBeOnTheScreen();
+    fireEvent.press(screen.getByTestId('have-account'));
     expect(await screen.findByText('I am a Corporate Employee')).toBeOnTheScreen();
     expect(screen.getByText('I am an Individual')).toBeOnTheScreen();
-    expect(screen.getByTestId('emergency-banner')).toBeOnTheScreen();
   });
 
   it('validates the email before calling the server', async () => {
-    renderRouter(APP_DIR, { initialUrl: '/' });
+    await openChooser();
     fireEvent.press(await screen.findByTestId('choose-individual'));
     fireEvent.changeText(await screen.findByTestId('email-input'), 'not-an-email');
     fireEvent.press(screen.getByTestId('send-code'));
@@ -106,7 +115,7 @@ describe('email OTP authentication', () => {
   });
 
   it('shows a friendly error when the network fails', async () => {
-    renderRouter(APP_DIR, { initialUrl: '/' });
+    await openChooser();
     fireEvent.press(await screen.findByTestId('choose-individual'));
     fireEvent.changeText(await screen.findByTestId('email-input'), 'a@b.co');
     server.state.failNext = 'network';
@@ -115,7 +124,7 @@ describe('email OTP authentication', () => {
   });
 
   it('shows a friendly error on server failure without leaking details', async () => {
-    renderRouter(APP_DIR, { initialUrl: '/' });
+    await openChooser();
     fireEvent.press(await screen.findByTestId('choose-individual'));
     fireEvent.changeText(await screen.findByTestId('email-input'), 'a@b.co');
     server.state.failNext = { status: 500, body: { status: false, message: 'SQLSTATE[HY000] secret' } };
@@ -136,7 +145,7 @@ describe('session lifecycle', () => {
     const session = await signInDirect(server);
     await sessionStore.save({ ...session, expiresAt: new Date(Date.now() - 1000).toISOString() });
     renderRouter(APP_DIR, { initialUrl: '/' });
-    expect(await screen.findByText('I am a Corporate Employee')).toBeOnTheScreen();
+    expect(await screen.findByTestId('get-started')).toBeOnTheScreen();
     expect(await sessionStore.load()).toBeNull();
   });
 
@@ -158,7 +167,7 @@ describe('session lifecycle', () => {
     await act(async () => {
       await buttons.find((b) => b.text === 'Log out')!.onPress!();
     });
-    expect(await screen.findByText('I am a Corporate Employee')).toBeOnTheScreen();
+    expect(await screen.findByTestId('get-started')).toBeOnTheScreen();
     expect(server.state.calls.some((c) => c.path === 'auth/logout')).toBe(true);
     expect(server.state.sessions.size).toBe(0);
     expect(await sessionStore.load()).toBeNull();

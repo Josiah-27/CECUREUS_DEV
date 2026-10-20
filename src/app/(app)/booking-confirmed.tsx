@@ -1,4 +1,6 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import CalendarPlus from 'lucide-react-native/icons/calendar-plus';
+import CheckCircle2 from 'lucide-react-native/icons/circle-check';
+import Clock from 'lucide-react-native/icons/clock';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Linking, StyleSheet, View } from 'react-native';
 
@@ -27,11 +29,11 @@ export default function BookingConfirmedScreen() {
   return (
     <Screen edges={['bottom']} contentStyle={styles.content}>
       <View style={styles.hero}>
-        <Ionicons
-          name={confirmed ? 'checkmark-circle' : 'time'}
-          size={88}
-          color={confirmed ? colors.success : colors.warning}
-        />
+        {confirmed ? (
+          <CheckCircle2 size={88} color={colors.teal} />
+        ) : (
+          <Clock size={88} color={colors.amber} />
+        )}
         <AppText variant="display" align="center" testID="booking-status-title">
           {confirmed ? 'Booking Confirmed!' : 'Booking Request Received'}
         </AppText>
@@ -54,7 +56,7 @@ export default function BookingConfirmedScreen() {
           <Button
             variant="outline"
             label="Add to Calendar"
-            icon={<Ionicons name="calendar-outline" size={20} color={colors.primary} />}
+            icon={<CalendarPlus size={18} color={colors.primary} />}
             onPress={() =>
               void Linking.openURL(
                 googleCalendarUrl({

@@ -3,6 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "dependencies": {
+    "@expo-google-fonts/nunito": "^0.4.2",
     "@expo/ui": "~57.0.25",
     "@expo/vector-icons": "^15.0.2",
     "expo": "~57.0.30",
@@ -20,6 +21,7 @@
     "expo-symbols": "~57.0.3",
     "expo-system-ui": "~57.0.4",
     "expo-web-browser": "~57.0.3",
+    "lucide-react-native": "1.49.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
@@ -27,6 +29,7 @@
     "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
+    "react-native-svg": "15.15.4",
     "react-native-web": "~0.21.0",
     "react-native-worklets": "0.10.1",
     "zod": "^3.25.76"
@@ -55,7 +58,8 @@
     "test:coverage": "jest --ci --coverage",
     "doctor": "npx expo-doctor@latest",
     "config:android": "expo config --type public --json",
-    "check": "npm run typecheck && npm run lint && npm run test:coverage"
+    "check": "npm run typecheck && npm run lint && npm run test:coverage",
+    "mock-api": "node scripts/mock-api.mjs"
   },
   "private": true,
   "jest": {
@@ -74,6 +78,11 @@
       "!src/**/__tests__/**",
       "!src/test/**"
     ],
-    "testTimeout": 20000
+    "testTimeout": 20000,
+    "moduleNameMapper": {
+      "^lucide-react-native/icons/(.*)$": "<rootDir>/node_modules/lucide-react-native/dist/cjs/icons/$1.js",
+      "^lucide-react-native$": "<rootDir>/node_modules/lucide-react-native/dist/cjs/lucide-react-native.js"
+    },
+    "maxWorkers": "50%"
   }
 }

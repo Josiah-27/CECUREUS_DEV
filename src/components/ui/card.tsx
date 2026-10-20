@@ -3,19 +3,31 @@ import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'rea
 
 import { colors, radius, shadow, spacing } from '@/theme';
 
+type Tone = 'default' | 'soft' | 'amber' | 'emergency';
+
 type Props = {
   children: ReactNode;
   onPress?: () => void;
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
   testID?: string;
-  tone?: 'default' | 'soft' | 'emergency';
+  tone?: Tone;
 };
 
-const toneBg = { default: colors.background, soft: colors.primarySoft, emergency: colors.emergencySoft };
+const toneBg: Record<Tone, string> = {
+  default: colors.background,
+  soft: colors.tealLight,
+  amber: colors.amberLight,
+  emergency: colors.emergencySoft,
+};
 
 export function Card({ children, onPress, accessibilityLabel, style, testID, tone = 'default' }: Props) {
-  const base = [styles.card, { backgroundColor: toneBg[tone] }, tone === 'default' && shadow.card, style];
+  const base = [
+    styles.card,
+    { backgroundColor: toneBg[tone] },
+    tone === 'default' && [styles.bordered, shadow.card],
+    style,
+  ];
   if (!onPress) {
     return (
       <View testID={testID} style={base}>
@@ -29,7 +41,7 @@ export function Card({ children, onPress, accessibilityLabel, style, testID, ton
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       onPress={onPress}
-      style={({ pressed }) => [base, pressed && { opacity: 0.85 }]}
+      style={({ pressed }) => [base, pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
     >
       {children}
     </Pressable>
@@ -37,10 +49,6 @@ export function Card({ children, onPress, accessibilityLabel, style, testID, ton
 }
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
+  card: { borderRadius: radius.lg, padding: spacing.lg },
+  bordered: { borderWidth: 1, borderColor: colors.borderSubtle },
 });

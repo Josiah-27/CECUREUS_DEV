@@ -1,4 +1,4 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
@@ -19,7 +19,9 @@ export default function BreathingListScreen() {
         >
           <View style={styles.row}>
             <View style={styles.icon}>
-              <Ionicons name={e.icon} size={24} color={colors.primary} />
+              <AppText style={styles.emoji} importantForAccessibility="no">
+                {e.emoji}
+              </AppText>
             </View>
             <View style={styles.flex}>
               <AppText variant="subheading">{e.title}</AppText>
@@ -27,7 +29,7 @@ export default function BreathingListScreen() {
                 {e.subtitle} · {Math.round(e.totalSeconds / 60)} min
               </AppText>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+            <ChevronRight size={18} color={colors.textMuted} />
           </View>
         </Card>
       ))}
@@ -46,4 +48,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   flex: { flex: 1 },
+  emoji: { fontSize: 22, lineHeight: 28 },
 });

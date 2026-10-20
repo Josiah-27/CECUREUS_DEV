@@ -23,7 +23,7 @@ export function MoodSelector({ value, onChange }: { value: Mood | null; onChange
             <AppText style={styles.emoji} importantForAccessibility="no">
               {m.emoji}
             </AppText>
-            <AppText variant="caption" color={selected ? colors.primary : colors.textMuted}>
+            <AppText variant="micro" color={selected ? colors.primary : colors.textMuted}>
               {m.label}
             </AppText>
           </Pressable>
@@ -34,20 +34,20 @@ export function MoodSelector({ value, onChange }: { value: Mood | null; onChange
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' },
+  row: { flexDirection: 'row', gap: spacing.xs + 2, flexWrap: 'wrap' },
   item: {
-    flexGrow: 1,
-    flexBasis: 58,
-    minHeight: 64,
-    paddingVertical: spacing.sm,
+    minWidth: 58,
+    minHeight: 56,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs + 2,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xxs,
+    gap: 2,
     borderRadius: radius.md,
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: colors.border,
     backgroundColor: colors.background,
   },
-  selected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
-  emoji: { fontSize: 24, lineHeight: 30 },
+  selected: { borderColor: colors.teal, backgroundColor: colors.tealLight },
+  emoji: { fontSize: 18, lineHeight: 24 },
 });

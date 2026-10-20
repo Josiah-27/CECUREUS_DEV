@@ -1,3 +1,4 @@
+import CalendarDays from 'lucide-react-native/icons/calendar-days';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Linking, Modal, ScrollView, StyleSheet, View } from 'react-native';
@@ -61,7 +62,7 @@ export default function SessionsScreen() {
         <EmptyState
           title={tab === 'upcoming' ? 'No upcoming sessions' : 'No past sessions yet'}
           message="Book a confidential session with one of our certified counsellors."
-          icon="calendar-outline"
+          Icon={CalendarDays}
           action={{ label: 'Find a counsellor', onPress: () => router.push('/counsellors') }}
         />
       ) : (

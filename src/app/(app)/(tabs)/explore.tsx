@@ -1,16 +1,21 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
+import CheckCircle from 'lucide-react-native/icons/circle-check-big';
+import ChevronRight from 'lucide-react-native/icons/chevron-right';
+import Clock from 'lucide-react-native/icons/clock';
+import PlayCircle from 'lucide-react-native/icons/circle-play';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { ArticleCard } from '@/components/article-card';
-import { EmergencyBanner } from '@/components/emergency-banner';
-import { AppText, Card, Chip, EmptyState, ErrorState, LoadingState, Screen, SectionHeader, TextField } from '@/components/ui';
+import { SupportCallCard } from '@/components/emergency-banner';
+import { TopNav } from '@/components/top-nav';
+import { AppText, EmptyState, ErrorState, IconChip, LoadingState, Screen, SearchBar, SectionHeader } from '@/components/ui';
 import { useQuery } from '@/hooks/use-query';
+import { useSavedArticles } from '@/hooks/use-saved-articles';
 import { BREATHING_EXERCISES } from '@/lib/breathing';
-import { categoryParam, CONTENT_CATEGORIES, WORKPLACE_TOPICS } from '@/lib/content';
+import { CATEGORY_EMOJI, categoryParam, CONTENT_CATEGORIES, WORKPLACE_TOPICS } from '@/lib/content';
 import { useApi } from '@/providers/api-provider';
-import { colors, radius, spacing } from '@/theme';
+import { accentCycle, colors, fonts, radius, shadow, spacing } from '@/theme';
 
 export default function ExploreScreen() {
   const api = useApi();
@@ -18,6 +23,7 @@ export default function ExploreScreen() {
   const [search, setSearch] = useState('');
   const assessments = useQuery(() => api.assessments.list(), []);
   const articles = useQuery(() => api.content.articles({ category: categoryParam(category) }), [category]);
+  const saved = useSavedArticles();
 
   function submitSearch() {
     const q = search.trim();
@@ -25,31 +31,39 @@ export default function ExploreScreen() {
   }
 
   return (
-    <Screen testID="explore-screen">
+    <Screen testID="explore-screen" header={<TopNav />}>
       <View style={styles.title}>
         <AppText variant="display">Explore</AppText>
         <AppText color={colors.textMuted}>Discover resources to understand, heal and grow.</AppText>
       </View>
 
-      <TextField
-        label="Search"
-        placeholder="Search blogs and articles…"
-        value={search}
-        onChangeText={setSearch}
-        returnKeyType="search"
-        onSubmitEditing={submitSearch}
-      />
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-        {CONTENT_CATEGORIES.map((c) => (
-          <Chip key={c} label={c} selected={category === c} onPress={() => setCategory(c)} testID={`category-${c}`} />
-        ))}
-      </ScrollView>
+      <View style={styles.searchBlock}>
+        <SearchBar
+          label="Search"
+          placeholder="Search blogs, assessments, exercises..."
+          value={search}
+          onChangeText={setSearch}
+          onSubmitEditing={submitSearch}
+        />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+          {CONTENT_CATEGORIES.map((c) => (
+            <IconChip
+              key={c}
+              label={c}
+              icon={CATEGORY_EMOJI[c]}
+              selected={category === c}
+              onPress={() => setCategory(c)}
+              testID={`category-${c}`}
+            />
+          ))}
+        </ScrollView>
+      </View>
 
       <View style={styles.section}>
         <SectionHeader
           title="Self Assessments"
           subtitle="Understand your current mental well-being."
+          icon={<CheckCircle size={14} color={colors.teal} />}
           onAction={() => router.push('/assessments')}
         />
         {assessments.loading ? (
@@ -57,31 +71,43 @@ export default function ExploreScreen() {
         ) : assessments.error ? (
           <ErrorState error={assessments.error} onRetry={assessments.reload} />
         ) : !assessments.data?.length ? (
-          <EmptyState title="Assessments coming soon" icon="clipboard-outline" />
+          <EmptyState title="Assessments coming soon" />
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-            {assessments.data.map((a) => (
-              <Card
-                key={a.id}
-                style={styles.assessment}
-                accessibilityLabel={`${a.title}. ${a.description ?? ''}`}
-                onPress={() => router.push({ pathname: '/assessments/[id]', params: { id: a.id } })}
-              >
-                <Ionicons name="clipboard-outline" size={28} color={colors.primary} />
-                <AppText variant="bodyStrong">{a.title}</AppText>
-                {a.description ? (
-                  <AppText variant="caption" color={colors.textMuted} numberOfLines={2}>
-                    {a.description}
+          <View style={styles.grid2}>
+            {assessments.data.slice(0, 4).map((a, i) => {
+              const tint = accentCycle[i % 4];
+              return (
+                <Pressable
+                  key={a.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${a.title}. ${a.description ?? ''}`}
+                  onPress={() => router.push({ pathname: '/assessments/[id]', params: { id: a.id } })}
+                  style={[styles.assessment, shadow.card]}
+                >
+                  <AppText variant="label" style={[styles.bold, { color: tint === colors.amber ? '#B45309' : colors.text }]}>
+                    {a.title}
                   </AppText>
-                ) : null}
-                {a.estimatedMinutes ? (
-                  <AppText variant="caption" color={colors.textMuted}>
-                    ⏱ {a.estimatedMinutes} mins
-                  </AppText>
-                ) : null}
-              </Card>
-            ))}
-          </ScrollView>
+                  <View style={[styles.assessmentIcon, { backgroundColor: `${tint}20` }]}>
+                    <View style={[styles.assessmentDot, { backgroundColor: tint }]} />
+                  </View>
+                  {a.description ? (
+                    <AppText variant="micro" color={colors.textMuted} numberOfLines={2}>
+                      {a.description}
+                    </AppText>
+                  ) : null}
+                  <View style={styles.assessmentFoot}>
+                    <View style={styles.time}>
+                      <Clock size={10} color={colors.textMuted} />
+                      <AppText variant="micro" color={colors.textMuted}>
+                        {a.estimatedMinutes ? `${a.estimatedMinutes} mins` : 'Quick'}
+                      </AppText>
+                    </View>
+                    <ChevronRight size={12} color={colors.textMuted} />
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
         )}
       </View>
 
@@ -96,17 +122,23 @@ export default function ExploreScreen() {
         ) : articles.error ? (
           <ErrorState error={articles.error} onRetry={articles.reload} />
         ) : !articles.data?.items.length ? (
-          <EmptyState title="No articles yet" message="Check back soon for new reads." icon="reader-outline" />
+          <EmptyState title="No articles yet" message="Check back soon for new reads." />
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
             {articles.data.items.slice(0, 6).map((a) => (
-              <ArticleCard key={a.id} article={a} horizontal />
+              <ArticleCard
+                key={a.id}
+                article={a}
+                horizontal
+                saved={saved.isSaved(a.id)}
+                onToggleSave={() => void saved.toggle(a)}
+              />
             ))}
           </ScrollView>
         )}
         <Pressable accessibilityRole="button" onPress={() => router.push('/videos')} style={styles.videos}>
-          <Ionicons name="play-circle-outline" size={24} color={colors.primary} />
-          <AppText variant="bodyStrong" color={colors.primary}>
+          <PlayCircle size={20} color={colors.teal} />
+          <AppText variant="label" color={colors.primary}>
             Watch wellness videos
           </AppText>
         </Pressable>
@@ -119,23 +151,23 @@ export default function ExploreScreen() {
           onAction={() => router.push('/breathing')}
         />
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-          {BREATHING_EXERCISES.map((e) => (
-            <Pressable
+          {BREATHING_EXERCISES.map((e, i) => (
+            <ActivityTile
               key={e.id}
-              accessibilityRole="button"
-              accessibilityLabel={`${e.title}, ${Math.round(e.totalSeconds / 60)} minutes`}
+              emoji={e.emoji}
+              label={e.title}
+              minutes={Math.round(e.totalSeconds / 60)}
+              tint={i % 2 === 0 ? colors.tealLight : colors.amberLight}
               onPress={() => router.push({ pathname: '/breathing/[id]', params: { id: e.id } })}
-              style={styles.activity}
-            >
-              <Ionicons name={e.icon} size={30} color={colors.primary} />
-              <AppText variant="label" align="center">
-                {e.title}
-              </AppText>
-              <AppText variant="caption" color={colors.textMuted}>
-                {Math.round(e.totalSeconds / 60)} mins
-              </AppText>
-            </Pressable>
+            />
           ))}
+          <ActivityTile
+            emoji="📓"
+            label="Gratitude Journaling"
+            minutes={5}
+            tint={colors.tealLight}
+            onPress={() => router.push('/journal')}
+          />
         </ScrollView>
       </View>
 
@@ -145,17 +177,21 @@ export default function ExploreScreen() {
           subtitle="Resources for a healthier and more respectful workplace."
           onAction={() => router.push({ pathname: '/articles', params: { category: 'Workplace' } })}
         />
-        <View style={styles.topics}>
-          {WORKPLACE_TOPICS.map((t) => (
+        <View style={styles.grid3}>
+          {WORKPLACE_TOPICS.map((t, i) => (
             <Pressable
               key={t.title}
               accessibilityRole="button"
               accessibilityLabel={t.title}
               onPress={() => router.push({ pathname: '/articles', params: { search: t.title } })}
-              style={styles.topic}
+              style={[styles.topic, shadow.card]}
             >
-              <Ionicons name={t.icon} size={26} color={colors.primary} />
-              <AppText variant="caption" align="center">
+              <View style={[styles.topicIcon, { backgroundColor: i % 2 === 0 ? colors.tealLight : colors.amberLight }]}>
+                <AppText style={styles.emoji} importantForAccessibility="no">
+                  {t.emoji}
+                </AppText>
+              </View>
+              <AppText variant="micro" align="center">
                 {t.title}
               </AppText>
             </Pressable>
@@ -163,25 +199,82 @@ export default function ExploreScreen() {
         </View>
       </View>
 
-      <EmergencyBanner />
+      <SupportCallCard title="Need immediate emotional support?" />
     </Screen>
   );
 }
 
+function ActivityTile({
+  emoji,
+  label,
+  minutes,
+  tint,
+  onPress,
+}: {
+  emoji: string;
+  label: string;
+  minutes: number;
+  tint: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${label}, ${minutes} minutes`}
+      onPress={onPress}
+      style={styles.activity}
+    >
+      <View style={[styles.activityIcon, { backgroundColor: tint }]}>
+        <AppText style={styles.activityEmoji} importantForAccessibility="no">
+          {emoji}
+        </AppText>
+      </View>
+      <AppText variant="micro" align="center" numberOfLines={2}>
+        {label}
+      </AppText>
+      <AppText variant="micro" color={colors.textMuted}>
+        {minutes} mins
+      </AppText>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  title: { gap: spacing.xs },
-  row: { gap: spacing.sm },
+  title: { gap: 2 },
+  searchBlock: { gap: spacing.md, marginTop: -spacing.sm },
+  row: { gap: spacing.sm, paddingRight: spacing.lg },
   section: { gap: spacing.md },
-  assessment: { width: 170, gap: spacing.xs },
-  videos: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 },
-  activity: {
-    width: 104,
-    alignItems: 'center',
-    gap: spacing.xs,
+  bold: { fontFamily: fonts.bold },
+  grid2: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: spacing.md },
+  assessment: {
+    width: '48%',
     padding: spacing.md,
     borderRadius: radius.lg,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    gap: spacing.xs,
   },
-  topics: { flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.md },
-  topic: { width: '33.33%', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.xs, minHeight: 64 },
+  assessmentIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  assessmentDot: { width: 16, height: 16, borderRadius: 8 },
+  assessmentFoot: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  time: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  videos: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 40 },
+  activity: { width: 84, alignItems: 'center', gap: 2 },
+  activityIcon: { width: 56, height: 56, borderRadius: radius.lg, alignItems: 'center', justifyContent: 'center' },
+  activityEmoji: { fontSize: 24, lineHeight: 30 },
+  grid3: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: spacing.sm },
+  topic: {
+    width: '31.5%',
+    alignItems: 'center',
+    gap: spacing.xs,
+    padding: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    minHeight: 84,
+  },
+  topicIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  emoji: { fontSize: 18, lineHeight: 24 },
 });

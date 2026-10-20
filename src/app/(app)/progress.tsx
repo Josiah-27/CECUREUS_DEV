@@ -53,7 +53,7 @@ export default function ProgressScreen() {
                     styles.bar,
                     {
                       height: d.score ? (d.score / 5) * CHART_HEIGHT : 3,
-                      backgroundColor: d.score ? (d.score >= 4 ? colors.primary : colors.brandOrange) : colors.border,
+                      backgroundColor: d.score ? (d.score >= 4 ? colors.primary : colors.amber) : colors.border,
                     },
                   ]}
                 />

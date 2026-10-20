@@ -1,4 +1,6 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import CheckCircle2 from 'lucide-react-native/icons/circle-check';
+import XCircle from 'lucide-react-native/icons/circle-x';
+import type { LucideIcon } from 'lucide-react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { StyleSheet, View } from 'react-native';
 
@@ -19,14 +21,14 @@ export default function PrivacyScreen() {
       <Card>
         <AppText variant="subheading">Your employer / HR can see</AppText>
         {CAN_SEE.map((t) => (
-          <Row key={t} icon="checkmark-circle" color={colors.success} text={t} />
+          <Row key={t} Icon={CheckCircle2} color={colors.teal} text={t} />
         ))}
       </Card>
 
       <Card>
         <AppText variant="subheading">Your employer / HR can never see</AppText>
         {CANNOT_SEE.map((t) => (
-          <Row key={t} icon="close-circle" color={colors.danger} text={t} />
+          <Row key={t} Icon={XCircle} color={colors.emergencyIcon} text={t} />
         ))}
       </Card>
 
@@ -43,10 +45,10 @@ export default function PrivacyScreen() {
   );
 }
 
-function Row({ icon, color, text }: { icon: 'checkmark-circle' | 'close-circle'; color: string; text: string }) {
+function Row({ Icon, color, text }: { Icon: LucideIcon; color: string; text: string }) {
   return (
     <View style={styles.row}>
-      <Ionicons name={icon} size={18} color={color} />
+      <Icon size={18} color={color} />
       <AppText style={styles.flex}>{text}</AppText>
     </View>
   );

@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/kv-store';
 
 /**
  * Encrypted on-device JSON storage built on expo-secure-store (Android Keystore).

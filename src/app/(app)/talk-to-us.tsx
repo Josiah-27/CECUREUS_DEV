@@ -1,4 +1,6 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import HeartHandshake from 'lucide-react-native/icons/heart-handshake';
+import MessageCircle from 'lucide-react-native/icons/message-circle';
+import Phone from 'lucide-react-native/icons/phone';
 import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
@@ -11,7 +13,9 @@ export default function TalkToUsScreen() {
   return (
     <Screen edges={['bottom']} contentStyle={styles.content}>
       <View style={styles.hero}>
-        <Ionicons name="heart-circle" size={88} color={colors.primary} />
+        <View style={styles.heroIcon}>
+          <HeartHandshake size={44} color={colors.teal} />
+        </View>
         <AppText variant="title" align="center">
           We are here for you.{'\n'}You are not alone.
         </AppText>
@@ -28,7 +32,7 @@ export default function TalkToUsScreen() {
           testID="call-now"
           variant="emergency"
           label="Call Now"
-          icon={<Ionicons name="call" size={20} color="#FFFFFF" />}
+          icon={<Phone size={18} color="#FFFFFF" />}
           onPress={confirmAndCallHelpline}
         />
       </View>
@@ -38,7 +42,7 @@ export default function TalkToUsScreen() {
           testID="whatsapp"
           variant="outline"
           label={`WhatsApp ${WHATSAPP_DISPLAY}`}
-          icon={<Ionicons name="logo-whatsapp" size={20} color={colors.primary} />}
+          icon={<MessageCircle size={18} color={colors.primary} />}
           onPress={() => void openWhatsApp()}
         />
         <Button variant="secondary" label="Book a Counsellor" onPress={() => router.push('/counsellors')} />
@@ -54,5 +58,13 @@ export default function TalkToUsScreen() {
 const styles = StyleSheet.create({
   content: { flexGrow: 1, justifyContent: 'center' },
   hero: { alignItems: 'center', gap: spacing.md },
+  heroIcon: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: colors.tealLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   block: { gap: spacing.md },
 });

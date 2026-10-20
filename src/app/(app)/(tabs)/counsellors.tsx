@@ -1,12 +1,14 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import Search from 'lucide-react-native/icons/search';
+import Users from 'lucide-react-native/icons/users';
 import { useState } from 'react';
 import { FlatList, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { Counsellor } from '@/api/schemas';
 import { CounsellorCard } from '@/components/counsellor-card';
-import { EmergencyBanner } from '@/components/emergency-banner';
-import { AppText, Button, Card, Chip, EmptyState, ErrorState, LoadingState, TextField } from '@/components/ui';
+import { EmergencyBanner, SupportCallCard } from '@/components/emergency-banner';
+import { TopNav } from '@/components/top-nav';
+import { AppText, Button, Card, Chip, EmptyState, ErrorState, LoadingState, SearchBar } from '@/components/ui';
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useQuery } from '@/hooks/use-query';
 import { appendUnique } from '@/lib/collections';
@@ -60,19 +62,23 @@ export default function CounsellorsScreen() {
         <AppText color={colors.textMuted}>Connect confidentially with our certified mental health experts.</AppText>
       </View>
       <EmergencyBanner />
-      <AppText variant="heading">Find the right support for you</AppText>
-      <TextField
+      <AppText variant="subheading">Find the right support for you</AppText>
+      <SearchBar
         testID="counsellor-search"
-        label="Search"
-        placeholder="Search by name, expertise, language…"
+        label="Search counsellors"
+        placeholder="Search by name, expertise, language..."
         value={search}
         onChangeText={setSearch}
-        returnKeyType="search"
-        autoCorrect={false}
       />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
         {EXPERTISE_FILTERS.map((f) => (
-          <Chip key={f} label={f} selected={filter === f} onPress={() => setFilter(f)} testID={`filter-${f}`} />
+          <Chip
+            key={f}
+            label={f === 'All' ? 'All Counsellors' : f}
+            selected={filter === f}
+            onPress={() => setFilter(f)}
+            testID={`filter-${f}`}
+          />
         ))}
       </ScrollView>
     </View>
@@ -80,6 +86,7 @@ export default function CounsellorsScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <TopNav />
       <FlatList
         testID="counsellor-list"
         data={query.loading || query.error ? [] : items}
@@ -102,7 +109,7 @@ export default function CounsellorsScreen() {
             <EmptyState
               title="No counsellors found"
               message="Try a different search or filter."
-              icon="search-outline"
+              Icon={Search}
               action={
                 search || filter !== 'All'
                   ? {
@@ -120,24 +127,26 @@ export default function CounsellorsScreen() {
         ListFooterComponent={
           <View style={styles.footer}>
             {loadingMore ? <LoadingState label="Loading more…" /> : null}
-            <Card tone="soft">
+            <Card>
               <View style={styles.match}>
-                <Ionicons name="people-outline" size={24} color={colors.primary} />
+                <View style={styles.matchIcon}>
+                  <Users size={16} color={colors.teal} />
+                </View>
                 <View style={styles.flex}>
-                  <AppText variant="bodyStrong">Can&apos;t find the right match?</AppText>
-                  <AppText variant="caption" color={colors.textMuted}>
+                  <AppText variant="label">Can&apos;t find the right match?</AppText>
+                  <AppText variant="micro" color={colors.textMuted}>
                     Our care team will help you find the most suitable counsellor.
                   </AppText>
                 </View>
+                <Button
+                  compact
+                  variant="ghost"
+                  label="Get Matched"
+                  onPress={() => void openWhatsApp('Hi CecureUs, please help me find the right counsellor.')}
+                />
               </View>
-              <Button
-                compact
-                variant="outline"
-                label="Get Matched on WhatsApp"
-                onPress={() => void openWhatsApp('Hi CecureUs, please help me find the right counsellor.')}
-                style={styles.matchButton}
-              />
             </Card>
+            <SupportCallCard title="Need to talk to someone right now?" />
           </View>
         }
       />
@@ -146,13 +155,20 @@ export default function CounsellorsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  safe: { flex: 1, backgroundColor: colors.screen },
   list: { padding: spacing.lg, paddingBottom: spacing.xxxl },
-  header: { gap: spacing.lg, marginBottom: spacing.lg },
-  titleBlock: { gap: spacing.xs },
+  header: { gap: spacing.md, marginBottom: spacing.lg },
+  titleBlock: { gap: 2 },
   chips: { gap: spacing.sm },
   footer: { marginTop: spacing.xl, gap: spacing.lg },
-  match: { flexDirection: 'row', gap: spacing.md },
-  matchButton: { marginTop: spacing.md },
+  match: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  matchIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.tealLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   flex: { flex: 1 },
 });

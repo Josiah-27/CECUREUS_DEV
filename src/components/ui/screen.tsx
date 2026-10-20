@@ -22,6 +22,8 @@ type Props = {
   refreshing?: boolean;
   onRefresh?: () => void;
   footer?: ReactNode;
+  /** Rendered edge-to-edge above the scrolling content (e.g. the top nav bar). */
+  header?: ReactNode;
   testID?: string;
 };
 
@@ -33,10 +35,12 @@ export function Screen({
   refreshing,
   onRefresh,
   footer,
+  header,
   testID,
 }: Props) {
   return (
     <SafeAreaView style={styles.safe} edges={edges} testID={testID}>
+      {header}
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {scroll ? (
           <ScrollView
@@ -61,7 +65,7 @@ export function Screen({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.background },
+  safe: { flex: 1, backgroundColor: colors.screen },
   flex: { flex: 1 },
   content: { padding: spacing.lg, gap: spacing.xl, paddingBottom: spacing.xxxl },
   footer: {

@@ -1,10 +1,11 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
+import BadgeCheck from 'lucide-react-native/icons/badge-check';
+import Star from 'lucide-react-native/icons/star';
 import { StyleSheet, View } from 'react-native';
 
 import type { Counsellor } from '@/api/schemas';
 import { resolveMediaUrl } from '@/lib/media';
-import { colors, spacing } from '@/theme';
+import { colors, fonts, spacing } from '@/theme';
 
 import { AppText, Avatar, Button, Card, Chip } from './ui';
 
@@ -16,66 +17,75 @@ export function CounsellorCard({ counsellor }: { counsellor: Counsellor }) {
   const c = counsellor;
   return (
     <Card testID={`counsellor-${c.id}`}>
-      <View style={styles.top}>
-        <Avatar name={c.name} uri={resolveMediaUrl(c.imageUrl)} size={64} />
+      <View style={styles.row}>
+        <Avatar name={c.name} uri={resolveMediaUrl(c.imageUrl)} size={56} />
         <View style={styles.info}>
           <View style={styles.nameRow}>
-            <AppText variant="subheading" style={styles.flex}>
+            <AppText variant="label" style={styles.name} numberOfLines={2}>
               {c.name}
             </AppText>
-            <Ionicons name="checkmark-circle" size={18} color={colors.brandBlue} accessibilityLabel="Verified" />
+            <BadgeCheck size={14} color={colors.teal} accessibilityLabel="Verified" />
           </View>
-          {counsellorMeta(c) ? (
-            <AppText variant="caption" color={colors.textMuted}>
-              {counsellorMeta(c)}
+          {c.title ? (
+            <AppText variant="micro" color={colors.textMuted}>
+              {c.title}
+            </AppText>
+          ) : null}
+          {c.experienceYears ? (
+            <AppText variant="micro" color={colors.textMuted}>
+              {c.experienceYears}+ Years Experience
             </AppText>
           ) : null}
           {c.rating ? (
-            <AppText variant="caption">
-              ★ {c.rating.toFixed(1)}
-              {c.sessionsCount ? ` (${c.sessionsCount} sessions)` : ''}
-            </AppText>
+            <View style={styles.rating}>
+              <Star size={11} color={colors.star} fill={colors.star} />
+              <AppText variant="micro">{c.rating.toFixed(1)}</AppText>
+              {c.sessionsCount ? (
+                <AppText variant="micro" color={colors.textMuted}>
+                  ({c.sessionsCount} sessions)
+                </AppText>
+              ) : null}
+            </View>
+          ) : null}
+          {c.expertise.length ? (
+            <View style={styles.tags}>
+              {c.expertise.slice(0, 4).map((e) => (
+                <Chip key={e} label={e} kind="tag" />
+              ))}
+              {c.expertise.length > 4 ? <Chip label={`+${c.expertise.length - 4}`} kind="tag" /> : null}
+            </View>
           ) : null}
           {c.languages.length ? (
-            <AppText variant="caption" color={colors.textMuted}>
-              Languages: {c.languages.join(', ')}
+            <AppText variant="micro" color={colors.textMuted}>
+              🌐 {c.languages.join(', ')}
             </AppText>
           ) : null}
         </View>
-      </View>
-      {c.expertise.length ? (
-        <View style={styles.chips}>
-          {c.expertise.slice(0, 4).map((e) => (
-            <Chip key={e} label={e} />
-          ))}
-          {c.expertise.length > 4 ? <Chip label={`+${c.expertise.length - 4}`} /> : null}
+        <View style={styles.actions}>
+          <Button
+            compact
+            variant="outline"
+            label="View Profile"
+            onPress={() => router.push({ pathname: '/counsellor/[id]', params: { id: c.id } })}
+          />
+          <Button
+            compact
+            label="Book Session"
+            testID={`book-${c.id}`}
+            onPress={() => router.push({ pathname: '/book/[id]', params: { id: c.id } })}
+          />
         </View>
-      ) : null}
-      <View style={styles.actions}>
-        <Button
-          compact
-          variant="outline"
-          label="View Profile"
-          style={styles.flex}
-          onPress={() => router.push({ pathname: '/counsellor/[id]', params: { id: c.id } })}
-        />
-        <Button
-          compact
-          label="Book Session"
-          testID={`book-${c.id}`}
-          style={styles.flex}
-          onPress={() => router.push({ pathname: '/book/[id]', params: { id: c.id } })}
-        />
       </View>
     </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  top: { flexDirection: 'row', gap: spacing.md },
-  info: { flex: 1, gap: spacing.xxs },
+  row: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
+  info: { flex: 1, gap: 2 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  flex: { flex: 1 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.md },
-  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  name: { fontFamily: fonts.bold, flexShrink: 1 },
+  rating: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: spacing.xs },
+  actions: { gap: spacing.xs + 2 },
 });

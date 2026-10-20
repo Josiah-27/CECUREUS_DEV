@@ -1,9 +1,10 @@
 export { AppText } from './app-text';
-export { Avatar, initialsOf } from './avatar';
+export { accentFor, Avatar, initialsOf } from './avatar';
 export { Button } from './button';
 export { Card } from './card';
-export { Chip } from './chip';
+export { Chip, IconChip } from './chip';
 export { Screen } from './screen';
+export { SearchBar } from './search-bar';
 export { SectionHeader } from './section-header';
 export { EmptyState, ErrorState, LoadingState } from './states';
 export { TextField } from './text-field';

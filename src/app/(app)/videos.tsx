@@ -1,4 +1,5 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import PlayCircle from 'lucide-react-native/icons/circle-play';
+import Video from 'lucide-react-native/icons/video';
 import { Image } from 'expo-image';
 import * as WebBrowser from 'expo-web-browser';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
@@ -29,7 +30,7 @@ export default function VideosScreen() {
   if (query.loading) return <LoadingState />;
   if (query.error || !query.data) return <ErrorState error={query.error} onRetry={query.reload} />;
   if (!query.data.items.length) {
-    return <EmptyState title="No videos yet" message="New wellness videos are on the way." icon="videocam-outline" />;
+    return <EmptyState title="No videos yet" message="New wellness videos are on the way." Icon={Video} />;
   }
 
   return (
@@ -47,7 +48,7 @@ export default function VideosScreen() {
           >
             <View style={styles.thumb}>
               {thumb ? <Image source={{ uri: thumb }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
-              <Ionicons name="play-circle" size={48} color="#FFFFFF" style={styles.play} />
+              <PlayCircle size={48} color="#FFFFFF" />
               {v.durationSeconds ? (
                 <View style={styles.duration}>
                   <AppText variant="caption" color="#FFFFFF">

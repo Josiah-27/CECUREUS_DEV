@@ -8,8 +8,20 @@ The Phase 1 app is implemented and passes all automated checks **against a mock 
 released until the backend API exists (BACKEND_BLOCKERS.md B-00…B-07, B-13…B-15), a native build has been
 produced and tested on a device, and the legal URLs and final app ID are confirmed.
 
-`npm run check` → typecheck ✅ · lint ✅ · **110/110 tests ✅** (10 suites, stable across 5 consecutive runs) ·
-coverage 85.9% statements / 87.7% lines. `expo-doctor` 21/21 ✅. Android production JS bundle export ✅.
+`npm run check` → typecheck ✅ · lint ✅ · **120/120 tests ✅** (12 suites). `expo-doctor` 21/21 ✅. Android production JS bundle export ✅.
+
+## UI redesign (Figma "Build Prototype") — branch `feature/figma-ui`
+Source: the Figma Make code export `Build Prototype.zip` (22 Jun 2026); the live Figma link could not be read
+(Figma connector not authorised). Ported to React Native: Nunito font, brand tokens, Lucide icons, top bar with
+menu + notifications, custom bottom bar with raised Ally button, splash + user-type choice, and the Home, Explore,
+Ally, Counsellor and Profile layouts. Real data and safety logic were kept; the prototype's fake counsellors,
+fake "Booked!" button and canned Ally replies were **not** copied.
+Deliberate deviations: buttons/teal text use `#0E847E` (white on design teal `#17B8B0` is 2.5:1, below WCAG AA);
+Profile drops "Change Password" (OTP login has no password) and "Notification Preferences" (no push in Phase 1).
+Added: article read history ("Blogs Completed"), bookmarks, side menu, notifications empty state, web preview +
+`npm run mock-api`. Verified with headless-Edge screenshots of the web preview against the mock API.
+Icons are imported per-file (full Lucide index grew the Android bundle 3.2 → 5.5 MB; now 3.4 MB).
+Jest capped at 50% workers (8 GB RAM machine was swapping with 11 workers).
 
 ## Module status
 

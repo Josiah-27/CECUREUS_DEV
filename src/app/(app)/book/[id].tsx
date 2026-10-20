@@ -1,4 +1,9 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import CalendarX from 'lucide-react-native/icons/calendar-x';
+import MessageCircle from 'lucide-react-native/icons/message-circle';
+import Phone from 'lucide-react-native/icons/phone';
+import ShieldCheck from 'lucide-react-native/icons/shield-check';
+import Video from 'lucide-react-native/icons/video';
+import type { LucideIcon } from 'lucide-react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -16,10 +21,10 @@ import { colors, radius, spacing } from '@/theme';
 
 const DAYS_AHEAD = 14;
 const MAX_NOTES = 500;
-const MODES: { id: SessionMode; label: string; icon: 'call-outline' | 'videocam-outline' | 'chatbubble-outline' }[] = [
-  { id: 'audio', label: 'Audio', icon: 'call-outline' },
-  { id: 'video', label: 'Video', icon: 'videocam-outline' },
-  { id: 'chat', label: 'Chat', icon: 'chatbubble-outline' },
+const MODES: { id: SessionMode; label: string; Icon: LucideIcon }[] = [
+  { id: 'audio', label: 'Audio', Icon: Phone },
+  { id: 'video', label: 'Video', Icon: Video },
+  { id: 'chat', label: 'Chat', Icon: MessageCircle },
 ];
 
 export default function BookSessionScreen() {
@@ -147,7 +152,7 @@ export default function BookSessionScreen() {
           <EmptyState
             title="No available slots"
             message={`${c.name} has no open slots in the next ${DAYS_AHEAD} days. Please check back later or choose another counsellor.`}
-            icon="calendar-outline"
+            Icon={CalendarX}
             action={{ label: 'Refresh', onPress: availability.reload }}
           />
         ) : (
@@ -218,7 +223,7 @@ export default function BookSessionScreen() {
                 onPress={() => setMode(m.id)}
                 style={[styles.mode, selected && styles.modeSelected]}
               >
-                <Ionicons name={m.icon} size={22} color={selected ? colors.primary : colors.textMuted} />
+                <m.Icon size={22} color={selected ? colors.teal : colors.textMuted} />
                 <AppText variant="label" color={selected ? colors.primary : colors.text}>
                   {m.label}
                 </AppText>
@@ -267,7 +272,7 @@ export default function BookSessionScreen() {
       {user?.userType === 'corporate' ? (
         <Card tone="soft" testID="covered-notice">
           <View style={styles.covered}>
-            <Ionicons name="shield-checkmark" size={24} color={colors.success} />
+            <ShieldCheck size={24} color={colors.teal} />
             <AppText style={styles.flex}>Covered under your organisation&apos;s wellness program. No payment needed.</AppText>
           </View>
         </Card>

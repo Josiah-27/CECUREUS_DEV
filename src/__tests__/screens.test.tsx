@@ -100,7 +100,7 @@ describe('profile', () => {
     await act(async () => {
       fireEvent.press(screen.getByTestId('delete-account'));
     });
-    expect(await screen.findByText('I am a Corporate Employee')).toBeOnTheScreen();
+    expect(await screen.findByTestId('get-started')).toBeOnTheScreen();
     expect(server.state.deletionRequests).toEqual(['harsha@fixturecorp.com']);
     expect(await journalStore.all()).toEqual([]);
     expect(await goalStore.all()).toEqual([]);

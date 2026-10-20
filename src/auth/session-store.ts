@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/kv-store';
 
 import { authSessionSchema, type AuthSession } from '@/api/schemas';
 

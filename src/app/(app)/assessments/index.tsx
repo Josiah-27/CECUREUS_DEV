@@ -1,4 +1,5 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import ChevronRight from 'lucide-react-native/icons/chevron-right';
+import ClipboardList from 'lucide-react-native/icons/clipboard-list';
 import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
@@ -20,7 +21,7 @@ export default function AssessmentsScreen() {
         Short, private check-ins to help you understand your well-being. These are not a medical diagnosis.
       </AppText>
       {query.data.length === 0 ? (
-        <EmptyState title="No assessments available" message="Please check back later." icon="clipboard-outline" />
+        <EmptyState title="No assessments available" message="Please check back later." Icon={ClipboardList} />
       ) : (
         query.data.map((a) => (
           <Card
@@ -30,7 +31,7 @@ export default function AssessmentsScreen() {
             onPress={() => router.push({ pathname: '/assessments/[id]', params: { id: a.id } })}
           >
             <View style={styles.row}>
-              <Ionicons name="clipboard-outline" size={28} color={colors.primary} />
+              <ClipboardList size={26} color={colors.teal} />
               <View style={styles.flex}>
                 <AppText variant="subheading">{a.title}</AppText>
                 {a.description ? <AppText color={colors.textMuted}>{a.description}</AppText> : null}
@@ -40,7 +41,7 @@ export default function AssessmentsScreen() {
                     .join(' · ')}
                 </AppText>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+              <ChevronRight size={18} color={colors.textMuted} />
             </View>
           </Card>
         ))

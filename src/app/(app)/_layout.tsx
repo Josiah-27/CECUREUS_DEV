@@ -9,7 +9,7 @@ export default function AppLayout() {
         headerShadowVisible: false,
         headerTintColor: colors.text,
         headerTitleStyle: { ...typography.heading, color: colors.text },
-        contentStyle: { backgroundColor: colors.background },
+        contentStyle: { backgroundColor: colors.screen },
         headerBackButtonDisplayMode: 'minimal',
       }}
     >
@@ -32,6 +32,7 @@ export default function AppLayout() {
       <Stack.Screen name="privacy" options={{ title: 'Privacy & Safety' }} />
       <Stack.Screen name="delete-account" options={{ title: 'Delete Account' }} />
       <Stack.Screen name="talk-to-us" options={{ title: 'Emergency Support' }} />
+      <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
     </Stack>
   );
 }

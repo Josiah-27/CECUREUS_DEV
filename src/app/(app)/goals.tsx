@@ -1,4 +1,8 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import CheckCircle2 from 'lucide-react-native/icons/circle-check';
+import Circle from 'lucide-react-native/icons/circle';
+import RotateCcw from 'lucide-react-native/icons/rotate-ccw';
+import Trash2 from 'lucide-react-native/icons/trash';
+import Trophy from 'lucide-react-native/icons/trophy';
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
@@ -82,11 +86,11 @@ export default function GoalsScreen() {
                   hitSlop={8}
                   disabled={g.archived}
                 >
-                  <Ionicons
-                    name={doneToday ? 'checkmark-circle' : 'ellipse-outline'}
-                    size={30}
-                    color={doneToday ? colors.success : colors.textMuted}
-                  />
+                  {doneToday ? (
+                    <CheckCircle2 size={28} color={colors.teal} />
+                  ) : (
+                    <Circle size={28} color={colors.textMuted} />
+                  )}
                 </Pressable>
                 <View style={styles.flex}>
                   <AppText variant="bodyStrong">{g.title}</AppText>
@@ -100,7 +104,7 @@ export default function GoalsScreen() {
                   hitSlop={8}
                   onPress={async () => goals.setItems(await goalStore.setArchived(g.id, !g.archived))}
                 >
-                  <Ionicons name={g.archived ? 'refresh' : 'trophy-outline'} size={22} color={colors.primary} />
+                  {g.archived ? <RotateCcw size={20} color={colors.teal} /> : <Trophy size={20} color={colors.amber} />}
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
@@ -113,7 +117,7 @@ export default function GoalsScreen() {
                     ])
                   }
                 >
-                  <Ionicons name="trash-outline" size={22} color={colors.textMuted} />
+                  <Trash2 size={20} color={colors.textMuted} />
                 </Pressable>
               </View>
             </Card>

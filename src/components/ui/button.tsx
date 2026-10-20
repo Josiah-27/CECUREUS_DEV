@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
-import { colors, radius, spacing, TOUCH_TARGET } from '@/theme';
+import { colors, radius, shadow, spacing, TOUCH_TARGET } from '@/theme';
 
 import { AppText } from './app-text';
 
@@ -14,6 +14,7 @@ type Props = {
   disabled?: boolean;
   loading?: boolean;
   icon?: ReactNode;
+  trailingIcon?: ReactNode;
   accessibilityHint?: string;
   testID?: string;
   style?: StyleProp<ViewStyle>;
@@ -22,11 +23,11 @@ type Props = {
 
 const palette: Record<Variant, { bg: string; fg: string; border: string; pressed: string }> = {
   primary: { bg: colors.primary, fg: colors.textOnPrimary, border: colors.primary, pressed: colors.primaryPressed },
-  secondary: { bg: colors.primarySoft, fg: colors.primary, border: colors.primarySoft, pressed: '#D3ECEC' },
-  outline: { bg: colors.background, fg: colors.primary, border: colors.primary, pressed: colors.primarySoft },
-  ghost: { bg: 'transparent', fg: colors.primary, border: 'transparent', pressed: colors.primarySoft },
+  secondary: { bg: colors.tealLight, fg: colors.primary, border: colors.tealLight, pressed: '#CBEFEF' },
+  outline: { bg: colors.background, fg: colors.primary, border: colors.primary, pressed: colors.tealLight },
+  ghost: { bg: 'transparent', fg: colors.primary, border: 'transparent', pressed: colors.tealLight },
   danger: { bg: colors.danger, fg: '#FFFFFF', border: colors.danger, pressed: '#912018' },
-  emergency: { bg: colors.emergency, fg: '#FFFFFF', border: colors.emergency, pressed: '#9A3412' },
+  emergency: { bg: colors.emergency, fg: '#FFFFFF', border: colors.emergency, pressed: '#991B1B' },
 };
 
 export function Button({
@@ -36,6 +37,7 @@ export function Button({
   disabled,
   loading,
   icon,
+  trailingIcon,
   accessibilityHint,
   testID,
   style,
@@ -55,6 +57,7 @@ export function Button({
       style={({ pressed }) => [
         styles.base,
         compact && styles.compact,
+        variant === 'primary' && !compact && shadow.card,
         { backgroundColor: pressed ? p.pressed : p.bg, borderColor: p.border, opacity: inactive ? 0.55 : 1 },
         style,
       ]}
@@ -64,9 +67,10 @@ export function Button({
       ) : (
         <View style={styles.row}>
           {icon}
-          <AppText variant="bodyStrong" color={p.fg}>
+          <AppText variant={compact ? 'label' : 'bodyStrong'} color={p.fg}>
             {label}
           </AppText>
+          {trailingIcon}
         </View>
       )}
     </Pressable>
@@ -82,6 +86,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  compact: { minHeight: 40, paddingHorizontal: spacing.lg },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  compact: { minHeight: 36, paddingHorizontal: spacing.md },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
 });

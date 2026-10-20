@@ -5,7 +5,7 @@ export type BreathingExercise = {
   title: string;
   subtitle: string;
   description: string;
-  icon: 'leaf-outline' | 'square-outline' | 'moon-outline' | 'pulse-outline' | 'footsteps-outline';
+  emoji: string;
   totalSeconds: number;
   phases: BreathPhase[];
   /** Optional guided steps shown instead of / alongside the breathing circle. */
@@ -18,7 +18,7 @@ export const BREATHING_EXERCISES: BreathingExercise[] = [
     title: '2-min Calm Breathing',
     subtitle: 'Quick relaxation',
     description: 'Slow, even breaths to settle your nervous system.',
-    icon: 'leaf-outline',
+    emoji: '🌬️',
     totalSeconds: 120,
     phases: [
       { label: 'Inhale', seconds: 4, scale: 1 },
@@ -30,7 +30,7 @@ export const BREATHING_EXERCISES: BreathingExercise[] = [
     title: 'Box Breathing',
     subtitle: 'Calm your mind',
     description: 'Inhale, hold, exhale and hold for four counts each.',
-    icon: 'square-outline',
+    emoji: '🧘',
     totalSeconds: 180,
     phases: [
       { label: 'Inhale', seconds: 4, scale: 1 },
@@ -44,7 +44,7 @@ export const BREATHING_EXERCISES: BreathingExercise[] = [
     title: 'Sleep Relaxation',
     subtitle: 'Better sleep',
     description: 'The 4-7-8 pattern helps your body wind down before sleep.',
-    icon: 'moon-outline',
+    emoji: '🌙',
     totalSeconds: 240,
     phases: [
       { label: 'Inhale', seconds: 4, scale: 1 },
@@ -57,7 +57,7 @@ export const BREATHING_EXERCISES: BreathingExercise[] = [
     title: 'Panic Reset',
     subtitle: 'Instant calm',
     description: 'A double inhale followed by a long exhale (physiological sigh).',
-    icon: 'pulse-outline',
+    emoji: '☀️',
     totalSeconds: 60,
     phases: [
       { label: 'Inhale', seconds: 2, scale: 0.85 },
@@ -70,7 +70,7 @@ export const BREATHING_EXERCISES: BreathingExercise[] = [
     title: 'Grounding Exercise',
     subtitle: 'Stay present',
     description: 'The 5-4-3-2-1 technique brings attention back to the present moment.',
-    icon: 'footsteps-outline',
+    emoji: '🌿',
     totalSeconds: 180,
     phases: [
       { label: 'Inhale', seconds: 4, scale: 1 },

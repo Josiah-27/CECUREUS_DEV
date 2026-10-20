@@ -1,4 +1,7 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import Pause from 'lucide-react-native/icons/pause';
+import Play from 'lucide-react-native/icons/play';
+import SkipForward from 'lucide-react-native/icons/skip-forward';
+import Sparkles from 'lucide-react-native/icons/sparkles';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
@@ -76,7 +79,7 @@ export default function BreathingExerciseScreen() {
     return (
       <Screen edges={['bottom']} footer={<Button testID="save-progress" label="Save progress" onPress={finish} />}>
         <View style={styles.center}>
-          <Ionicons name="sparkles" size={56} color={colors.brandOrange} />
+          <Sparkles size={56} color={colors.amber} />
           <AppText variant="title" align="center">
             Well done!
           </AppText>
@@ -134,7 +137,7 @@ export default function BreathingExerciseScreen() {
           onPress={() => setRunning((r) => !r)}
           style={styles.playButton}
         >
-          <Ionicons name={running ? 'pause' : 'play'} size={28} color="#FFFFFF" />
+          {running ? <Pause size={26} color="#FFFFFF" fill="#FFFFFF" /> : <Play size={26} color="#FFFFFF" fill="#FFFFFF" />}
         </Pressable>
         <AppText variant="heading" testID="breathing-clock">
           {formatClock(remainingTotal)}
@@ -148,7 +151,7 @@ export default function BreathingExerciseScreen() {
           }}
           style={styles.skip}
         >
-          <Ionicons name="play-skip-forward" size={24} color={colors.textMuted} />
+          <SkipForward size={22} color={colors.textMuted} />
         </Pressable>
       </View>
     </Screen>

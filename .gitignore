@@ -54,3 +54,6 @@ coverage/
 *.keystore
 google-services*.json
 play-service-account*.json
+
+# web design preview build
+dist-web/

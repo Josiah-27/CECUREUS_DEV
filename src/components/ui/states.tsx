@@ -1,4 +1,6 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
+import CloudOff from 'lucide-react-native/icons/cloud-off';
+import Leaf from 'lucide-react-native/icons/leaf';
+import type { LucideIcon } from 'lucide-react-native';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { friendlyMessage } from '@/api/errors';
@@ -10,7 +12,7 @@ import { Button } from './button';
 export function LoadingState({ label = 'Loading…' }: { label?: string }) {
   return (
     <View style={styles.center} accessibilityRole="progressbar" accessibilityLabel={label}>
-      <ActivityIndicator size="large" color={colors.primary} />
+      <ActivityIndicator size="large" color={colors.teal} />
       <AppText variant="caption" color={colors.textMuted}>
         {label}
       </AppText>
@@ -21,7 +23,7 @@ export function LoadingState({ label = 'Loading…' }: { label?: string }) {
 export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   return (
     <View style={styles.center} testID="error-state">
-      <Ionicons name="cloud-offline-outline" size={40} color={colors.textMuted} />
+      <CloudOff size={40} color={colors.textMuted} />
       <AppText variant="body" align="center" accessibilityLiveRegion="polite">
         {friendlyMessage(error)}
       </AppText>
@@ -33,17 +35,19 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () =>
 export function EmptyState({
   title,
   message,
-  icon = 'leaf-outline',
+  Icon = Leaf,
   action,
 }: {
   title: string;
   message?: string;
-  icon?: keyof typeof Ionicons.glyphMap;
+  Icon?: LucideIcon;
   action?: { label: string; onPress: () => void };
 }) {
   return (
     <View style={styles.center} testID="empty-state">
-      <Ionicons name={icon} size={40} color={colors.primary} />
+      <View style={styles.iconWrap}>
+        <Icon size={28} color={colors.teal} />
+      </View>
       <AppText variant="subheading" align="center">
         {title}
       </AppText>
@@ -59,4 +63,12 @@ export function EmptyState({
 
 const styles = StyleSheet.create({
   center: { alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.xxl },
+  iconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.tealLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

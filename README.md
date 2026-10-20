@@ -2,6 +2,7 @@
 
 Mental health & wellbeing app for corporate employees (B2B) and individuals (B2C).
 Expo SDK 57 · React Native 0.86 · TypeScript · Expo Router. Android first; iOS later.
+UI follows the Figma Make prototype "Build Prototype" (Nunito, teal `#17B8B0` / amber `#F59E0B` / navy `#1A2B4A`, Lucide icons).
 
 > Status: Phase 1 app implemented and tested against a **mock** backend. Real backend integration and native
 > builds are pending — see [PROJECT_STATUS.md](PROJECT_STATUS.md) and [BACKEND_BLOCKERS.md](BACKEND_BLOCKERS.md).
@@ -27,6 +28,16 @@ development; release builds use EAS.
 | `npm run test:coverage` | Tests with coverage report |
 | `npm run check` | All of the above — run before every commit |
 | `npm run doctor` | Expo Doctor dependency/config diagnostics |
+| `npm run mock-api` | Local mock backend on http://localhost:4000/v1 (any email, OTP `123456`) |
+
+### Preview the UI without a backend or Android device
+
+```bash
+npm run mock-api                                               # terminal 1
+EXPO_PUBLIC_API_BASE_URL=http://localhost:4000/v1 npm run web  # terminal 2
+```
+
+The web build is for design review only (sessions are kept in `sessionStorage`); it is never shipped.
 
 ## Project layout
 
