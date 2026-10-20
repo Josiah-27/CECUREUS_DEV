@@ -12,6 +12,8 @@ export type AppEnv = {
   privacyPolicyUrl: string;
   termsUrl: string;
   appEnv: 'development' | 'preview' | 'production';
+  /** Development only: the app talks to a built-in fake backend instead of the network. */
+  demoMode: boolean;
 };
 
 export class EnvError extends Error {
@@ -27,6 +29,7 @@ type RawEnv = {
   EXPO_PUBLIC_PRIVACY_POLICY_URL?: string;
   EXPO_PUBLIC_TERMS_URL?: string;
   EXPO_PUBLIC_APP_ENV?: string;
+  EXPO_PUBLIC_DEMO_MODE?: string;
 };
 
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '10.0.2.2'];
@@ -39,7 +42,7 @@ function validateUrl(name: string, value: string | undefined, appEnv: AppEnv['ap
   try {
     url = new URL(value);
   } catch {
-    throw new EnvError(`${name} is not a valid URL`);
+    throw new EnvError(`${name} is not a valid URL — it must start with http:// or https:// (got "${value}")`);
   }
   const isLocal = LOCAL_HOSTS.includes(url.hostname) || PRIVATE_LAN.test(url.hostname);
   if (url.protocol !== 'https:' && !(appEnv === 'development' && isLocal)) {
@@ -54,9 +57,19 @@ export function parseEnv(raw: RawEnv): AppEnv {
     throw new EnvError('EXPO_PUBLIC_APP_ENV must be development, preview or production');
   }
   const appEnv = appEnvRaw;
+  const demoMode = raw.EXPO_PUBLIC_DEMO_MODE === 'true';
+  if (demoMode && appEnv !== 'development') {
+    throw new EnvError('EXPO_PUBLIC_DEMO_MODE is only allowed when EXPO_PUBLIC_APP_ENV=development');
+  }
   return {
     appEnv,
-    apiBaseUrl: validateUrl('EXPO_PUBLIC_API_BASE_URL', raw.EXPO_PUBLIC_API_BASE_URL, appEnv),
+    demoMode,
+    // In demo mode no network is used, so the API URL is optional.
+    apiBaseUrl: validateUrl(
+      'EXPO_PUBLIC_API_BASE_URL',
+      raw.EXPO_PUBLIC_API_BASE_URL ?? (demoMode ? DEMO_API_BASE_URL : undefined),
+      appEnv,
+    ),
     mediaBaseUrl: validateUrl('EXPO_PUBLIC_MEDIA_BASE_URL', raw.EXPO_PUBLIC_MEDIA_BASE_URL, appEnv),
     privacyPolicyUrl: validateUrl(
       'EXPO_PUBLIC_PRIVACY_POLICY_URL',
@@ -66,6 +79,9 @@ export function parseEnv(raw: RawEnv): AppEnv {
     termsUrl: validateUrl('EXPO_PUBLIC_TERMS_URL', raw.EXPO_PUBLIC_TERMS_URL, appEnv),
   };
 }
+
+/** Placeholder base URL used by the in-app fake backend in demo mode. */
+export const DEMO_API_BASE_URL = 'http://localhost:4000/v1';
 
 let cached: AppEnv | null = null;
 
@@ -77,6 +93,7 @@ export function getEnv(): AppEnv {
       EXPO_PUBLIC_PRIVACY_POLICY_URL: process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL,
       EXPO_PUBLIC_TERMS_URL: process.env.EXPO_PUBLIC_TERMS_URL,
       EXPO_PUBLIC_APP_ENV: process.env.EXPO_PUBLIC_APP_ENV,
+      EXPO_PUBLIC_DEMO_MODE: process.env.EXPO_PUBLIC_DEMO_MODE,
     });
   }
   return cached;

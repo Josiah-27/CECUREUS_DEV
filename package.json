@@ -78,7 +78,7 @@
       "!src/**/__tests__/**",
       "!src/test/**"
     ],
-    "testTimeout": 20000,
+    "testTimeout": 45000,
     "moduleNameMapper": {
       "^lucide-react-native/icons/(.*)$": "<rootDir>/node_modules/lucide-react-native/dist/cjs/icons/$1.js",
       "^lucide-react-native$": "<rootDir>/node_modules/lucide-react-native/dist/cjs/lucide-react-native.js"

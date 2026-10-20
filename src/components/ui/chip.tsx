@@ -63,7 +63,7 @@ export function IconChip({
       onPress={onPress}
       style={[styles.iconChip, selected ? styles.iconChipSelected : styles.iconChipIdle]}
     >
-      <AppText style={styles.emoji} importantForAccessibility="no">
+      <AppText style={styles.emoji} aria-hidden>
         {icon}
       </AppText>
       <AppText variant="micro" color={selected ? colors.primary : colors.textMuted}>

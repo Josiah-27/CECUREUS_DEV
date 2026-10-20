@@ -42,7 +42,7 @@ export default function ArticleScreen() {
         <Image source={{ uri: image }} style={styles.image} contentFit="cover" />
       ) : (
         <View style={[styles.image, styles.placeholder]}>
-          <AppText style={styles.emoji} importantForAccessibility="no">
+          <AppText style={styles.emoji} aria-hidden>
             🌿
           </AppText>
         </View>

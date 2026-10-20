@@ -19,7 +19,7 @@ export default function BreathingListScreen() {
         >
           <View style={styles.row}>
             <View style={styles.icon}>
-              <AppText style={styles.emoji} importantForAccessibility="no">
+              <AppText style={styles.emoji} aria-hidden>
                 {e.emoji}
               </AppText>
             </View>

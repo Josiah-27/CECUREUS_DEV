@@ -94,7 +94,7 @@ export default function VerifyScreen() {
       </View>
 
       <Pressable onPress={() => inputRef.current?.focus()} accessible={false}>
-        <View style={styles.boxes} importantForAccessibility="no-hide-descendants">
+        <View style={styles.boxes} aria-hidden>
           {Array.from({ length: OTP_LENGTH }, (_, i) => (
             <View key={i} style={[styles.box, code.length === i && styles.boxActive, error && styles.boxError]}>
               <AppText variant="title">{code[i] ?? ''}</AppText>

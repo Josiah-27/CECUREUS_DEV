@@ -187,7 +187,7 @@ export default function ExploreScreen() {
               style={[styles.topic, shadow.card]}
             >
               <View style={[styles.topicIcon, { backgroundColor: i % 2 === 0 ? colors.tealLight : colors.amberLight }]}>
-                <AppText style={styles.emoji} importantForAccessibility="no">
+                <AppText style={styles.emoji} aria-hidden>
                   {t.emoji}
                 </AppText>
               </View>
@@ -225,7 +225,7 @@ function ActivityTile({
       style={styles.activity}
     >
       <View style={[styles.activityIcon, { backgroundColor: tint }]}>
-        <AppText style={styles.activityEmoji} importantForAccessibility="no">
+        <AppText style={styles.activityEmoji} aria-hidden>
           {emoji}
         </AppText>
       </View>

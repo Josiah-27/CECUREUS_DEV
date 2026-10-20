@@ -12,11 +12,27 @@ export function setUnauthorizedHandler(handler: (() => void) | null) {
   unauthorizedHandler = handler;
 }
 
+/**
+ * Demo mode (development only): route all API calls to the in-app fake backend.
+ * The check reads process.env directly so production builds, where the variable is
+ * unset, compile the branch away and never bundle the mock server.
+ */
+function demoFetch(baseUrl: string): typeof fetch | undefined {
+  if (process.env.EXPO_PUBLIC_DEMO_MODE === 'true' && process.env.EXPO_PUBLIC_APP_ENV === 'development') {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { createMockServer } = require('@/test/mock-server') as typeof import('@/test/mock-server');
+    return createMockServer({ baseUrl }).fetch;
+  }
+  return undefined;
+}
+
 /** Lazily creates the production API so a bad env config surfaces as a screen, not a crash at import. */
 export function getApi(): Endpoints {
   if (!instance) {
+    const env = getEnv();
     const client = createApiClient({
-      baseUrl: getEnv().apiBaseUrl,
+      baseUrl: env.apiBaseUrl,
+      fetchImpl: demoFetch(env.apiBaseUrl),
       getAccessToken: () => sessionStore.getToken(),
       onUnauthorized: () => unauthorizedHandler?.(),
     });

@@ -36,7 +36,7 @@ export function ArticleCard({ article, horizontal = false, saved, completed, onT
       {image ? (
         <Image source={{ uri: image }} style={StyleSheet.absoluteFill} contentFit="cover" />
       ) : (
-        <AppText style={styles.emoji} importantForAccessibility="no">
+        <AppText style={styles.emoji} aria-hidden>
           {placeholder.emoji}
         </AppText>
       )}

@@ -213,7 +213,7 @@ function Stat({
       style={[styles.stat, shadow.card]}
     >
       <View style={styles.statTop}>
-        <AppText style={styles.statEmoji} importantForAccessibility="no">
+        <AppText style={styles.statEmoji} aria-hidden>
           {emoji}
         </AppText>
         <AppText variant="title" color={color === colors.amber ? '#B45309' : color}>

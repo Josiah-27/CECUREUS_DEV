@@ -48,6 +48,23 @@ describe('parseEnv', () => {
     expect(() => parseEnv({ ...base, EXPO_PUBLIC_API_BASE_URL: 'http://172.32.0.1:4000' })).toThrow(/https/);
   });
 
+  it('supports demo mode in development without an API URL', () => {
+    const env = parseEnv({ ...base, EXPO_PUBLIC_API_BASE_URL: undefined, EXPO_PUBLIC_DEMO_MODE: 'true' });
+    expect(env.demoMode).toBe(true);
+    expect(env.apiBaseUrl).toBe('http://localhost:4000/v1');
+    expect(parseEnv(base).demoMode).toBe(false);
+  });
+
+  it('refuses demo mode outside development', () => {
+    expect(() =>
+      parseEnv({ ...base, EXPO_PUBLIC_APP_ENV: 'production', EXPO_PUBLIC_DEMO_MODE: 'true' }),
+    ).toThrow(/DEMO_MODE/);
+  });
+
+  it('explains a URL that is missing http(s)://', () => {
+    expect(() => parseEnv({ ...base, EXPO_PUBLIC_API_BASE_URL: '192.168.31.214' })).toThrow(/http:\/\/ or https:\/\//);
+  });
+
   it('rejects an unknown app env', () => {
     expect(() => parseEnv({ ...base, EXPO_PUBLIC_APP_ENV: 'staging' })).toThrow(EnvError);
   });

@@ -80,7 +80,7 @@ export default function AllyScreen() {
               onPress={() => (t.href ? router.push(t.href) : t.action?.())}
               style={[styles.topic, shadow.card]}
             >
-              <AppText style={styles.topicEmoji} importantForAccessibility="no">
+              <AppText style={styles.topicEmoji} aria-hidden>
                 {t.emoji}
               </AppText>
               <View style={styles.flex}>
@@ -153,7 +153,7 @@ export default function AllyScreen() {
               style={styles.quickItem}
             >
               <View style={[styles.quickIcon, { backgroundColor: i % 2 === 0 ? colors.tealLight : colors.amberLight }]}>
-                <AppText style={styles.quickEmoji} importantForAccessibility="no">
+                <AppText style={styles.quickEmoji} aria-hidden>
                   {q.emoji}
                 </AppText>
               </View>

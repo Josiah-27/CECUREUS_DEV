@@ -30,6 +30,12 @@ development; release builds use EAS.
 | `npm run doctor` | Expo Doctor dependency/config diagnostics |
 | `npm run mock-api` | Local mock backend on http://localhost:4000/v1 (any email, OTP `123456`) |
 
+### Demo mode on your phone (no backend needed)
+
+Set `EXPO_PUBLIC_DEMO_MODE=true` in `.env.local`, run `npx expo start -c`, and scan the QR code with Expo Go
+(SDK 57). The app uses a built-in fake backend on the phone: login with any email and code `123456`.
+A small "DEMO · sample data" badge is shown. Demo mode is refused outside development builds.
+
 ### Preview the UI without a backend or Android device
 
 ```bash

@@ -63,6 +63,8 @@ export type MockServerOptions = {
   now?: () => number;
   /** Force the SMS gateway to fail (booking must still be confirmed, notification marked failed). */
   smsFails?: boolean;
+  /** API base URL the client uses; defaults to EXPO_PUBLIC_API_BASE_URL. */
+  baseUrl?: string;
 };
 
 export function createMockServer(opts: MockServerOptions = {}) {
@@ -271,14 +273,14 @@ export function createMockServer(opts: MockServerOptions = {}) {
 
   const fetchImpl = (async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const url = new URL(String(input));
-    const base = new URL(process.env.EXPO_PUBLIC_API_BASE_URL!);
+    const base = new URL(opts.baseUrl ?? process.env.EXPO_PUBLIC_API_BASE_URL!);
     const path = url.pathname.replace(base.pathname, '').replace(/^\/+/, '');
     const method = (init.method ?? 'GET').toUpperCase();
     const headers = (init.headers ?? {}) as Record<string, string>;
     const body = init.body ? JSON.parse(String(init.body)) : undefined;
     state.calls.push({ url: String(input), method, path, headers, body });
 
-    if (init.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+    if (init.signal?.aborted) throw Object.assign(new Error('Aborted'), { name: 'AbortError' });
     const forced = state.failNext;
     state.failNext = null;
     if (forced === 'network') throw new TypeError('Network request failed');

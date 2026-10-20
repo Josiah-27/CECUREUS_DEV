@@ -11,6 +11,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { getApi } from '@/api';
 import { AuthProvider, useAuth } from '@/auth/auth-provider';
+import { DemoBadge } from '@/components/demo-badge';
 import { AppText } from '@/components/ui';
 import { getEnv } from '@/config/env';
 import { ApiProvider } from '@/providers/api-provider';
@@ -58,9 +59,9 @@ export default function RootLayout() {
   const setup = useMemo(() => {
     try {
       getEnv();
-      return { api: getApi(), error: null };
+      return { api: getApi(), error: null, demo: getEnv().demoMode };
     } catch (e) {
-      return { api: null, error: e instanceof Error ? e.message : 'Invalid configuration' };
+      return { api: null, error: e instanceof Error ? e.message : 'Invalid configuration', demo: false };
     }
   }, []);
 
@@ -71,6 +72,7 @@ export default function RootLayout() {
         <ApiProvider api={setup.api}>
           <AuthProvider>
             <RootNavigator />
+            {setup.demo ? <DemoBadge /> : null}
           </AuthProvider>
         </ApiProvider>
       ) : (

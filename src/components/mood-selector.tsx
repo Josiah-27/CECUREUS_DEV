@@ -20,7 +20,7 @@ export function MoodSelector({ value, onChange }: { value: Mood | null; onChange
             onPress={() => onChange(m.id)}
             style={[styles.item, selected && styles.selected]}
           >
-            <AppText style={styles.emoji} importantForAccessibility="no">
+            <AppText style={styles.emoji} aria-hidden>
               {m.emoji}
             </AppText>
             <AppText variant="micro" color={selected ? colors.primary : colors.textMuted}>
