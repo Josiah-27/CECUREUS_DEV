@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 
 import { ApiError, kindForStatus } from './errors';
@@ -81,6 +82,8 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
     signal?.addEventListener('abort', onExternalAbort);
 
     let res: Response;
+    let json: unknown;
+
     try {
       res = await fetchImpl(buildUrl(config.baseUrl, path, query), {
         method,
@@ -88,6 +91,9 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: controller.signal,
       });
+
+      // Keep timeout and cancellation active until the body has been read.
+      json = await readJson(res);
     } catch {
       if (timedOut) throw new ApiError('timeout', 'Request timed out');
       if (signal?.aborted) throw new ApiError('cancelled', 'Request cancelled');
@@ -96,8 +102,6 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
       clearTimeout(timer);
       signal?.removeEventListener('abort', onExternalAbort);
     }
-
-    const json = await readJson(res);
 
     if (!res.ok) {
       const parsed = failureEnvelope.safeParse(json);
