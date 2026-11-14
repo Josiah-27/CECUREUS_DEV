@@ -1,8 +1,11 @@
-import { Pressable, StyleSheet } from 'react-native';
+import { Animated, Pressable, StyleSheet } from 'react-native';
 
 import { colors, radius, spacing } from '@/theme';
 
 import { AppText } from './app-text';
+import { GlassSheen, useLiquidPress } from './glass';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 type Props = {
   label: string;
@@ -14,6 +17,7 @@ type Props = {
 };
 
 export function Chip({ label, selected = false, onPress, testID, kind = 'filter' }: Props) {
+  const liquid = useLiquidPress();
   if (kind === 'tag') {
     return (
       <Pressable testID={testID} accessibilityRole="text" disabled style={styles.tag}>
@@ -24,19 +28,22 @@ export function Chip({ label, selected = false, onPress, testID, kind = 'filter'
     );
   }
   return (
-    <Pressable
+    <AnimatedPressable
       testID={testID}
       accessibilityRole={onPress ? 'button' : 'text'}
       accessibilityState={onPress ? { selected } : undefined}
       onPress={onPress}
       disabled={!onPress}
       hitSlop={6}
-      style={[styles.chip, selected ? styles.selected : styles.idle]}
+      onPressIn={liquid.onPressIn}
+      onPressOut={liquid.onPressOut}
+      style={[styles.chip, selected ? styles.selected : styles.idle, liquid.style]}
     >
+      <GlassSheen radius={radius.pill} tone={selected ? 'tinted' : 'light'} />
       <AppText variant="label" color={selected ? colors.textOnPrimary : colors.textMuted}>
         {label}
       </AppText>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -54,22 +61,26 @@ export function IconChip({
   onPress: () => void;
   testID?: string;
 }) {
+  const liquid = useLiquidPress();
   return (
-    <Pressable
+    <AnimatedPressable
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ selected }}
       onPress={onPress}
-      style={[styles.iconChip, selected ? styles.iconChipSelected : styles.iconChipIdle]}
+      onPressIn={liquid.onPressIn}
+      onPressOut={liquid.onPressOut}
+      style={[styles.iconChip, selected ? styles.iconChipSelected : styles.iconChipIdle, liquid.style]}
     >
+      <GlassSheen radius={radius.md} tone="light" />
       <AppText style={styles.emoji} aria-hidden>
         {icon}
       </AppText>
       <AppText variant="micro" color={selected ? colors.primary : colors.textMuted}>
         {label}
       </AppText>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
