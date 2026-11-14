@@ -7,13 +7,16 @@ import { colors, radius, spacing } from '@/theme';
 
 import { AppText, Button } from './ui';
 
-/** Always-visible emergency helpline banner (red tint, as in the design). */
+const SUPPORT_TITLE = 'Need Someone to Talk To?';
+const SUPPORT_SUBTITLE = 'Support is just one tap away.';
+
+/** Always-visible helpline banner (red tint, as in the design). */
 export function EmergencyBanner({ compact = false }: { compact?: boolean }) {
   return (
     <Pressable
       testID="emergency-banner"
       accessibilityRole="button"
-      accessibilityLabel={`Emergency helpline ${HELPLINE_DISPLAY}. If anyone touches you or makes you uncomfortable, get help immediately.`}
+      accessibilityLabel={`${SUPPORT_TITLE} ${SUPPORT_SUBTITLE} Helpline ${HELPLINE_DISPLAY}.`}
       accessibilityHint="Asks for confirmation, then opens the phone dialer"
       onPress={confirmAndCallHelpline}
       style={({ pressed }) => [styles.banner, compact && styles.compact, pressed && { opacity: 0.85 }]}
@@ -22,8 +25,11 @@ export function EmergencyBanner({ compact = false }: { compact?: boolean }) {
         <Phone size={compact ? 14 : 16} color={colors.emergencyIcon} />
       </View>
       <View style={styles.flex}>
-        <AppText variant={compact ? 'caption' : 'label'} color={compact ? colors.textMuted : colors.text}>
-          If anyone touches you or makes you uncomfortable, get help immediately.
+        <AppText variant={compact ? 'label' : 'bodyStrong'} color={colors.text}>
+          {SUPPORT_TITLE}
+        </AppText>
+        <AppText variant="caption" color={colors.textMuted}>
+          {SUPPORT_SUBTITLE}
         </AppText>
         {!compact ? (
           <>
