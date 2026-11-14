@@ -1,13 +1,9 @@
-import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, Animated, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import type { ReactNode } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { colors, radius, shadow, spacing, TOUCH_TARGET } from '@/theme';
 
 import { AppText } from './app-text';
-import { GlassSheen, useLiquidPress } from './glass';
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-const LIGHT: Variant[] = ['secondary', 'outline'];
 
 type Variant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'emergency';
 
@@ -49,11 +45,8 @@ export function Button({
 }: Props) {
   const p = palette[variant];
   const inactive = disabled || loading;
-  const [pressed, setPressed] = useState(false);
-  const liquid = useLiquidPress();
-  const filled = variant !== 'ghost' && !LIGHT.includes(variant);
   return (
-    <AnimatedPressable
+    <Pressable
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -61,24 +54,14 @@ export function Button({
       accessibilityState={{ disabled: !!inactive, busy: !!loading }}
       disabled={inactive}
       onPress={onPress}
-      onPressIn={() => {
-        setPressed(true);
-        liquid.onPressIn();
-      }}
-      onPressOut={() => {
-        setPressed(false);
-        liquid.onPressOut();
-      }}
-      style={[
+      style={({ pressed }) => [
         styles.base,
         compact && styles.compact,
-        filled && !compact && !inactive && [shadow.raised, { shadowColor: p.bg, shadowOpacity: 0.3 }],
+        variant === 'primary' && !compact && shadow.card,
         { backgroundColor: pressed ? p.pressed : p.bg, borderColor: p.border, opacity: inactive ? 0.55 : 1 },
         style,
-        liquid.style,
       ]}
     >
-      {variant !== 'ghost' ? <GlassSheen radius={radius.pill} tone={filled ? 'tinted' : 'light'} /> : null}
       {loading ? (
         <ActivityIndicator color={p.fg} />
       ) : (
@@ -90,7 +73,7 @@ export function Button({
           {trailingIcon}
         </View>
       )}
-    </AnimatedPressable>
+    </Pressable>
   );
 }
 
