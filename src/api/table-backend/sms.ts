@@ -81,14 +81,19 @@ export async function sendOtpSms(
     }
     throw new SmsError('SMS_NOT_CONFIGURED', 'SMS gateway is not configured');
   }
+  // A browser may send the request but not read the gateway's reply (the gateway sends no CORS
+  // headers), so the web build sends without reading it. Phones read and check the reply.
+  const inBrowser = typeof document !== 'undefined';
   let res: Response;
   try {
-    res = await fetchImpl(buildSmsUrl(config.urlTemplate, mobileE164, otp, config.messageTemplate), {
-      method: 'GET',
-    });
+    res = await fetchImpl(
+      buildSmsUrl(config.urlTemplate, mobileE164, otp, config.messageTemplate),
+      inBrowser ? { method: 'GET', mode: 'no-cors', credentials: 'omit', referrerPolicy: 'no-referrer' } : { method: 'GET' },
+    );
   } catch {
     throw new SmsError('SMS_FAILED', 'SMS gateway unreachable');
   }
+  if (res.type === 'opaque') return;
   if (!res.ok) throw new SmsError('SMS_FAILED', `SMS gateway returned ${res.status}`);
   const reply = (await res.text().catch(() => '')).trim().slice(0, 200);
   if (gatewayRejected(reply)) {

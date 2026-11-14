@@ -14,7 +14,7 @@ import { colors, spacing } from '@/theme';
 
 /**
  * "I already have an account": mobile number → SMS code.
- * Only numbers the CecureUs team has added (and activated) in employee_list can sign in.
+ * Only active numbers in employee_list can sign in; new people create an account first.
  */
 export default function SignInScreen() {
   const api = useApi();
@@ -107,7 +107,7 @@ export default function SignInScreen() {
         <AppText variant="bodyStrong">New to CecureUs?</AppText>
         <AppText variant="caption" color={colors.textMuted}>
           {error?.register
-            ? 'This number is not registered yet. Send us your details and our team will set up your account.'
+            ? 'This number is not registered yet. Create an account to get started.'
             : 'Create an account as a corporate employee or an individual.'}
         </AppText>
         <Button

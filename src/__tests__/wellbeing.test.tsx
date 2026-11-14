@@ -1,4 +1,4 @@
-import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
+import { cleanup, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 import * as WebBrowser from 'expo-web-browser';
 
 import { goalStore, moodStore } from '@/local/stores';
@@ -17,20 +17,20 @@ beforeEach(async () => {
   await signInDirect(server);
 });
 
-afterEach(() => jest.useRealTimers());
+// Unmount while the fake clock is still installed, so nothing from this test is left waiting on it.
+afterEach(async () => {
+  await cleanup();
+  jest.useRealTimers();
+});
 
 describe('goals', () => {
   it('adds a goal, marks it done today and shows the streak', async () => {
-    renderRouter(APP_DIR, { initialUrl: '/goals' });
-    fireEvent.changeText(await screen.findByTestId('goal-input'), 'Drink more water');
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('add-goal'));
-    });
+    await renderRouter(APP_DIR, { initialUrl: '/goals' });
+    await fireEvent.changeText(await screen.findByTestId('goal-input'), 'Drink more water');
+    await fireEvent.press(screen.getByTestId('add-goal'));
     expect(await screen.findByText('Drink more water')).toBeOnTheScreen();
     expect(screen.getByText('Start your streak today')).toBeOnTheScreen();
-    await act(async () => {
-      fireEvent.press(screen.getByLabelText('Mark Drink more water done for today'));
-    });
+    await fireEvent.press(screen.getByLabelText('Mark Drink more water done for today'));
     expect(await screen.findByText('1 day streak')).toBeOnTheScreen();
     expect((await goalStore.all())[0].completions).toHaveLength(1);
   });
@@ -40,7 +40,7 @@ describe('progress', () => {
   it('shows mood check-ins and weekly counts', async () => {
     await moodStore.record('good', new Date('2026-10-24T08:00:00.000Z'));
     await moodStore.record('stressed', new Date('2026-10-25T05:00:00.000Z'));
-    renderRouter(APP_DIR, { initialUrl: '/progress' });
+    await renderRouter(APP_DIR, { initialUrl: '/progress' });
     expect(await screen.findByLabelText('Mood trend for the last 7 days')).toBeOnTheScreen();
     expect(screen.getByText('Mood check-ins')).toBeOnTheScreen();
     await waitFor(() => expect(screen.getByText('2')).toBeOnTheScreen());
@@ -62,8 +62,8 @@ describe('progress', () => {
 
 describe('videos', () => {
   it('lists videos and opens them in the in-app browser', async () => {
-    renderRouter(APP_DIR, { initialUrl: '/videos' });
-    fireEvent.press(await screen.findByTestId('video-v1'));
+    await renderRouter(APP_DIR, { initialUrl: '/videos' });
+    await fireEvent.press(await screen.findByTestId('video-v1'));
     await waitFor(() =>
       expect(WebBrowser.openBrowserAsync).toHaveBeenCalledWith('https://www.youtube.com/watch?v=fixture'),
     );

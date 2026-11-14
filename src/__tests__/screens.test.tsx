@@ -1,4 +1,4 @@
-import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
+import { act, cleanup, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 import { Alert, Linking } from 'react-native';
 
 import { sessionStore } from '@/auth/session-store';
@@ -15,32 +15,36 @@ beforeEach(async () => {
   await signInDirect(server, 'corporate');
 });
 
-afterEach(() => jest.useRealTimers());
+// Unmount while the fake clock is still installed, so nothing from this test is left waiting on it.
+afterEach(async () => {
+  await cleanup();
+  jest.useRealTimers();
+});
 
 describe('home', () => {
   it('greets the user, records mood locally and navigates via tiles', async () => {
-    renderRouter(APP_DIR, { initialUrl: '/' });
+    await renderRouter(APP_DIR, { initialUrl: '/' });
     expect(await screen.findByText('Hi, Harsha 👋')).toBeOnTheScreen();
     expect(screen.getByText('Covered by Fixture Corp')).toBeOnTheScreen();
-    fireEvent.press(screen.getByTestId('mood-stressed'));
+    await fireEvent.press(screen.getByTestId('mood-stressed'));
     expect(screen.getByTestId('mood-support')).toBeOnTheScreen();
     await waitFor(async () => expect((await moodStore.all())[0]?.mood).toBe('stressed'));
     expect(server.state.calls.some((c) => JSON.stringify(c.body ?? '').includes('stressed'))).toBe(false);
 
-    fireEvent.press(screen.getByTestId('tile-breathing'));
+    await fireEvent.press(screen.getByTestId('tile-breathing'));
     expect(await screen.findByTestId('exercise-box')).toBeOnTheScreen();
   });
 });
 
 describe('counsellor directory', () => {
   it('lists counsellors with de-duplicated expertise and searches server-side after debounce', async () => {
-    renderRouter(APP_DIR, { initialUrl: '/counsellors' });
+    await renderRouter(APP_DIR, { initialUrl: '/counsellors' });
     expect(await screen.findByText('Test Counsellor One')).toBeOnTheScreen();
     expect(screen.getByText('Test Counsellor Two')).toBeOnTheScreen();
     expect(screen.getAllByText('Anxiety Management')).toHaveLength(1);
 
-    fireEvent.changeText(screen.getByTestId('counsellor-search'), 'Mumbai');
-    act(() => {
+    await fireEvent.changeText(screen.getByTestId('counsellor-search'), 'Mumbai');
+    await act(() => {
       jest.advanceTimersByTime(350);
     });
     await waitFor(() => expect(screen.queryByText('Test Counsellor One')).toBeNull());
@@ -51,22 +55,22 @@ describe('counsellor directory', () => {
 
   it('shows an empty state for no results and an error state with retry', async () => {
     server.state.failNext = { status: 503, body: { status: false } };
-    renderRouter(APP_DIR, { initialUrl: '/counsellors' });
+    await renderRouter(APP_DIR, { initialUrl: '/counsellors' });
     expect(await screen.findByTestId('error-state')).toBeOnTheScreen();
-    fireEvent.press(screen.getByText('Try again'));
+    await fireEvent.press(screen.getByText('Try again'));
     expect(await screen.findByText('Test Counsellor One')).toBeOnTheScreen();
 
-    fireEvent.changeText(screen.getByTestId('counsellor-search'), 'zzzz-nobody');
-    act(() => {
+    await fireEvent.changeText(screen.getByTestId('counsellor-search'), 'zzzz-nobody');
+    await act(() => {
       jest.advanceTimersByTime(350);
     });
     expect(await screen.findByText('No counsellors found')).toBeOnTheScreen();
   });
 
   it('opens a counsellor profile and starts booking from it', async () => {
-    renderRouter(APP_DIR, { initialUrl: '/counsellor/1' });
+    await renderRouter(APP_DIR, { initialUrl: '/counsellor/1' });
     expect(await screen.findByText('Areas of Expertise')).toBeOnTheScreen();
-    fireEvent.press(screen.getByTestId('profile-book'));
+    await fireEvent.press(screen.getByTestId('profile-book'));
     expect(await screen.findByTestId('confirm-booking')).toBeOnTheScreen();
   });
 });
@@ -74,18 +78,18 @@ describe('counsellor directory', () => {
 describe('profile', () => {
   it('edits name and age (stored in employee_list.emp_age) with validation', async () => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    renderRouter(APP_DIR, { initialUrl: '/edit-profile' });
-    fireEvent.changeText(await screen.findByTestId('age'), '15');
-    fireEvent.press(screen.getByTestId('save-profile'));
+    await renderRouter(APP_DIR, { initialUrl: '/edit-profile' });
+    await fireEvent.changeText(await screen.findByTestId('age'), '15');
+    await fireEvent.press(screen.getByTestId('save-profile'));
     expect(await screen.findByText('You must be 18 or older to use CecureUs.')).toBeOnTheScreen();
-    fireEvent.changeText(screen.getByTestId('age'), '130');
-    fireEvent.press(screen.getByTestId('save-profile'));
+    await fireEvent.changeText(screen.getByTestId('age'), '130');
+    await fireEvent.press(screen.getByTestId('save-profile'));
     expect(await screen.findByText('Enter an age between 18 and 100.')).toBeOnTheScreen();
     expect(server.state.calls.some((c) => c.method === 'PATCH')).toBe(false);
 
-    fireEvent.changeText(screen.getByTestId('first-name'), 'Harshini');
-    fireEvent.changeText(screen.getByTestId('age'), '29');
-    fireEvent.press(screen.getByTestId('save-profile'));
+    await fireEvent.changeText(screen.getByTestId('first-name'), 'Harshini');
+    await fireEvent.changeText(screen.getByTestId('age'), '29');
+    await fireEvent.press(screen.getByTestId('save-profile'));
     await waitFor(() => expect(alert).toHaveBeenCalledWith('Profile updated', expect.any(String)));
     const patch = server.state.calls.find((c) => c.method === 'PATCH');
     expect(patch?.body).toEqual({ firstName: 'Harshini', lastName: 'Verma', age: 29 });
@@ -96,11 +100,11 @@ describe('profile', () => {
 
   it('adds an age from the profile screen and shows it after saving', async () => {
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    renderRouter(APP_DIR, { initialUrl: '/profile' });
+    await renderRouter(APP_DIR, { initialUrl: '/profile' });
     expect(await screen.findByTestId('profile-age')).toHaveTextContent(/Age not set/);
-    fireEvent.press(screen.getByLabelText('Edit Profile'));
-    fireEvent.changeText(await screen.findByTestId('age'), '41');
-    fireEvent.press(screen.getByTestId('save-profile'));
+    await fireEvent.press(screen.getByLabelText('Edit Profile'));
+    await fireEvent.changeText(await screen.findByTestId('age'), '41');
+    await fireEvent.press(screen.getByTestId('save-profile'));
     expect(await screen.findByText('Age 41')).toBeOnTheScreen();
     expect(server.state.employee_list[0].emp_age).toBe('41');
   });
@@ -109,13 +113,11 @@ describe('profile', () => {
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     await journalStore.add({ text: 'private', prompt: null, mood: null });
     await goalStore.add('Sleep early');
-    renderRouter(APP_DIR, { initialUrl: '/delete-account' });
+    await renderRouter(APP_DIR, { initialUrl: '/delete-account' });
     const button = await screen.findByTestId('delete-account');
     expect(button).toBeDisabled();
-    fireEvent.changeText(screen.getByTestId('delete-confirm'), 'delete');
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('delete-account'));
-    });
+    await fireEvent.changeText(screen.getByTestId('delete-confirm'), 'delete');
+    await fireEvent.press(screen.getByTestId('delete-account'));
     expect(await screen.findByTestId('get-started')).toBeOnTheScreen();
     expect(server.state.deletionRequests).toEqual(['harsha@fixturecorp.com']);
     expect(await journalStore.all()).toEqual([]);
@@ -126,36 +128,36 @@ describe('profile', () => {
 
 describe('content', () => {
   it('shows assessments and articles on Explore and opens an article', async () => {
-    renderRouter(APP_DIR, { initialUrl: '/explore' });
+    await renderRouter(APP_DIR, { initialUrl: '/explore' });
     expect(await screen.findByText('Stress Level Check')).toBeOnTheScreen();
-    fireEvent.press(await screen.findByTestId('article-1'));
+    await fireEvent.press(await screen.findByTestId('article-1'));
     expect(await screen.findByText('First paragraph.')).toBeOnTheScreen();
     expect(screen.getByText('Second & last.')).toBeOnTheScreen();
   });
 
   it('filters articles by category and paginates', async () => {
-    renderRouter(APP_DIR, { initialUrl: '/articles' });
+    await renderRouter(APP_DIR, { initialUrl: '/articles' });
     expect(await screen.findByTestId('article-2')).toBeOnTheScreen();
-    fireEvent.press(screen.getByTestId('load-more'));
+    await fireEvent.press(screen.getByTestId('load-more'));
     await waitFor(() => expect(server.state.calls.some((c) => c.url.includes('page=2'))).toBe(true));
-    fireEvent.press(screen.getByTestId('category-Anxiety'));
+    await fireEvent.press(screen.getByTestId('category-Anxiety'));
     await waitFor(() => expect(screen.queryByTestId('article-1')).toBeNull());
     expect(screen.getByTestId('article-2')).toBeOnTheScreen();
   });
 
   it('shows an article-not-found error', async () => {
-    renderRouter(APP_DIR, { initialUrl: '/articles/999' });
+    await renderRouter(APP_DIR, { initialUrl: '/articles/999' });
     expect(await screen.findByTestId('error-state')).toBeOnTheScreen();
   });
 
   it('completes an assessment and stores the result locally', async () => {
-    renderRouter(APP_DIR, { initialUrl: '/assessments/1' });
-    fireEvent.press(await screen.findByTestId('start-assessment'));
+    await renderRouter(APP_DIR, { initialUrl: '/assessments/1' });
+    await fireEvent.press(await screen.findByTestId('start-assessment'));
     expect(screen.getByTestId('next-question')).toBeDisabled();
-    fireEvent.press(screen.getByTestId('option-b'));
-    fireEvent.press(screen.getByTestId('next-question'));
-    fireEvent.press(screen.getByTestId('option-d'));
-    fireEvent.press(screen.getByTestId('submit-assessment'));
+    await fireEvent.press(screen.getByTestId('option-b'));
+    await fireEvent.press(screen.getByTestId('next-question'));
+    await fireEvent.press(screen.getByTestId('option-d'));
+    await fireEvent.press(screen.getByTestId('submit-assessment'));
     expect(await screen.findByTestId('assessment-score')).toHaveTextContent('100%');
     expect(screen.getByText('Moderate')).toBeOnTheScreen();
     const submit = server.state.calls.find((c) => c.path === 'assessments/1/submit');
@@ -170,19 +172,17 @@ describe('content', () => {
 
 describe('wellbeing tools (on-device)', () => {
   it('saves a journal entry without sending it to the server', async () => {
-    renderRouter(APP_DIR, { initialUrl: '/journal' });
-    fireEvent.changeText(await screen.findByTestId('journal-input'), 'Felt calmer today');
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('save-journal'));
-    });
+    await renderRouter(APP_DIR, { initialUrl: '/journal' });
+    await fireEvent.changeText(await screen.findByTestId('journal-input'), 'Felt calmer today');
+    await fireEvent.press(screen.getByTestId('save-journal'));
     expect(await screen.findByText('Felt calmer today')).toBeOnTheScreen();
     expect(JSON.stringify(server.state.calls)).not.toContain('Felt calmer today');
   });
 
   it('runs a breathing exercise to completion and logs it', async () => {
-    renderRouter(APP_DIR, { initialUrl: '/breathing/panic-reset' });
-    fireEvent.press(await screen.findByTestId('toggle-breathing'));
-    act(() => {
+    await renderRouter(APP_DIR, { initialUrl: '/breathing/panic-reset' });
+    await fireEvent.press(await screen.findByTestId('toggle-breathing'));
+    await act(() => {
       jest.advanceTimersByTime(61_000);
     });
     expect(await screen.findByText('Well done!')).toBeOnTheScreen();
@@ -191,17 +191,17 @@ describe('wellbeing tools (on-device)', () => {
 
 describe('Talk to Us', () => {
   it('opens WhatsApp for +91 7200500221', async () => {
-    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
-    renderRouter(APP_DIR, { initialUrl: '/talk-to-us' });
-    fireEvent.press(await screen.findByTestId('whatsapp'));
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    await renderRouter(APP_DIR, { initialUrl: '/talk-to-us' });
+    await fireEvent.press(await screen.findByTestId('whatsapp'));
     expect(open).toHaveBeenCalledWith(expect.stringMatching(/^https:\/\/wa\.me\/917200500221\?text=/));
   });
 
   it('asks for confirmation before opening the dialer', async () => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
-    renderRouter(APP_DIR, { initialUrl: '/talk-to-us' });
-    fireEvent.press(await screen.findByTestId('call-now'));
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
+    await renderRouter(APP_DIR, { initialUrl: '/talk-to-us' });
+    await fireEvent.press(await screen.findByTestId('call-now'));
     expect(open).not.toHaveBeenCalled();
     expect(alert.mock.calls[0][0]).toBe('Call 1800 121 9497?');
     alert.mock.calls[0][2]![1].onPress!();
@@ -211,7 +211,7 @@ describe('Talk to Us', () => {
 
 describe('navigation', () => {
   it('has all five tabs with the Ally placeholder (Phase 2)', async () => {
-    renderRouter(APP_DIR, { initialUrl: '/ally' });
+    await renderRouter(APP_DIR, { initialUrl: '/ally' });
     expect(await screen.findByTestId('ally-coming-soon')).toBeOnTheScreen();
     for (const label of ['Home', 'Explore', 'Ally', 'Counsellor', 'Profile']) {
       expect(screen.getAllByText(label).length).toBeGreaterThan(0);

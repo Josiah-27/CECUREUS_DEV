@@ -1,4 +1,4 @@
-import { forwardRef } from 'react';
+import { forwardRef, type ComponentRef } from 'react';
 import { StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
 
 import { colors, radius, spacing, TOUCH_TARGET, typography } from '@/theme';
@@ -11,7 +11,7 @@ type Props = TextInputProps & {
   hint?: string;
 };
 
-export const TextField = forwardRef<TextInput, Props>(function TextField(
+export const TextField = forwardRef<ComponentRef<typeof TextInput>, Props>(function TextField(
   { label, error, hint, style, multiline, ...rest },
   ref,
 ) {

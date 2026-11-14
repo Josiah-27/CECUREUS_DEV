@@ -3,13 +3,13 @@ import type { RegistrationRequest } from '@/api/schemas';
 import { formatIndianMobile } from './validation';
 
 /**
- * WhatsApp message the CecureUs team receives for a new account request.
- * Plain text, one field per line, so it is easy to copy into the admin panel.
+ * WhatsApp message the CecureUs team receives when a person creates an account in the app.
+ * Plain text, one field per line, so it is easy to check against the admin panel.
  */
 export function registrationMessage(r: RegistrationRequest): string {
   const name = [r.firstName, r.lastName].filter(Boolean).join(' ');
   const lines = [
-    'New CecureUs account request',
+    'New CecureUs account',
     '',
     `Account type: ${r.userType === 'corporate' ? 'Corporate employee' : 'Individual'}`,
     `Name: ${name}`,
@@ -20,7 +20,7 @@ export function registrationMessage(r: RegistrationRequest): string {
     if (r.companyName) lines.push(`Company: ${r.companyName}`);
     if (r.employeeId) lines.push(`Employee ID: ${r.employeeId}`);
   }
-  lines.push('', 'Sent from the CecureUs app. Please add me so I can sign in with my mobile number.');
+  lines.push('', 'I have just created this account in the CecureUs app with the mobile number above.');
   return lines.join('\n');
 }
 

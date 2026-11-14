@@ -21,6 +21,7 @@ import {
   pageSchema,
   userSchema,
   videoSchema,
+  type RegistrationRequest,
   type SessionMode,
 } from './schemas';
 
@@ -36,12 +37,25 @@ export function createEndpoints(client: ApiClient) {
           // The table backend downloads employee_list to find the number; allow for slow networks.
           timeoutMs: 30000,
         }),
-      /** Checks the code and opens a session. */
+      /**
+       * Starts a new account: sends a code by SMS to the number in the request. The account is
+       * created when that code is verified with verifyOtp, which also signs the person in.
+       */
+      register: (details: RegistrationRequest) =>
+        client.request('auth/register', otpRequestSchema, {
+          method: 'POST',
+          auth: false,
+          body: details,
+          timeoutMs: 30000,
+        }),
+      /** Checks the code and opens a session (creating the account first for a new sign-up). */
       verifyOtp: (requestId: string, otp: string) =>
         client.request('auth/otp/verify', authSessionSchema, {
           method: 'POST',
           auth: false,
           body: { requestId, otp },
+          // A new sign-up re-reads employee_list and inserts a row; allow for slow networks.
+          timeoutMs: 45000,
         }),
       logout: () => client.request('auth/logout', okSchema, { method: 'POST' }),
     },

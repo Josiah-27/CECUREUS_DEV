@@ -2,7 +2,7 @@ import { createApiClient } from '@/api/client';
 import { createEndpoints } from '@/api/endpoints';
 import { ApiError } from '@/api/errors';
 
-import { createTableBackend, OTP_MAX_ATTEMPTS, OTP_MAX_PER_HOUR, OTP_RESEND_MS, OTP_TTL_MS, type SessionStorage } from '..';
+import { createTableBackend, OTP_DEVICE_MAX_PER_DAY, OTP_DEVICE_MAX_PER_HOUR, OTP_WRONG_MAX, WRITE_LIMITS, type LimitStorage, OTP_MAX_ATTEMPTS, OTP_MAX_PER_HOUR, OTP_RESEND_MS, OTP_TTL_MS, type SessionStorage } from '..';
 import type { Row } from '../mapping';
 import { buildSmsUrl, DEFAULT_SMS_MESSAGE } from '../sms';
 import { istToIso, legacyTimestamp, parseClock, parseTimeRange } from '../time';
@@ -115,6 +115,14 @@ function createWorld(opts: { sms?: string | null; consoleFallback?: boolean; pos
     },
   };
 
+  let storedLimits: unknown = null;
+  const limitStorage: LimitStorage = {
+    read: async () => JSON.parse(JSON.stringify(storedLimits)),
+    write: async (l) => {
+      storedLimits = JSON.parse(JSON.stringify(l));
+    },
+  };
+
   let otpSeq = 0;
   let tokenSeq = 0;
   const makeBackend = () =>
@@ -128,6 +136,7 @@ function createWorld(opts: { sms?: string | null; consoleFallback?: boolean; pos
       },
       fetchImpl: net,
       sessionStorage,
+      limitStorage,
       now: () => state.now,
       generateOtp: () => String(482910 + otpSeq++),
       generateToken: () => `token-${++tokenSeq}`,
@@ -147,8 +156,10 @@ function createWorld(opts: { sms?: string | null; consoleFallback?: boolean; pos
     return session;
   }
 
+  const lastCode = () => decodeURIComponent(sms[sms.length - 1]).match(/code is (\d{6})/)![1];
+
   return {
-    db, calls, sms, state, api, signIn,
+    db, calls, sms, state, api, signIn, lastCode,
     restart: () => {
       backend = makeBackend();
     },
@@ -156,6 +167,9 @@ function createWorld(opts: { sms?: string | null; consoleFallback?: boolean; pos
       token = t;
     },
     writes: () => calls.filter((c) => c.method !== 'GET'),
+    corruptLimits: (value: unknown) => {
+      storedLimits = value;
+    },
   };
 }
 
@@ -425,5 +439,205 @@ describe('errors', () => {
     expect(server.message).not.toContain('db down');
     w.state.failNext = 'network';
     expect((await apiError(w.api.bookings.list())).kind).toBe('network');
+  });
+});
+
+describe('sign up (the app adds the person to employee_list)', () => {
+  const details = {
+    userType: 'corporate' as const,
+    firstName: '  Meera <b>',
+    lastName: 'Iyer',
+    email: 'Meera@Fixture.com',
+    mobile: '+919000011111',
+    companyName: 'Fixture Corp',
+    employeeId: 'FC-7',
+  };
+
+  it('writes nothing until the SMS code is verified, then inserts one row and signs in', async () => {
+    const w = createWorld();
+    const req = await w.api.auth.register(details);
+    expect(w.sms).toHaveLength(1);
+    expect(w.sms[0]).toContain('to=919000011111');
+    expect(w.writes()).toHaveLength(0);
+
+    const session = await w.api.auth.verifyOtp(req.requestId, w.lastCode());
+    const posts = w.writes();
+    expect(posts).toHaveLength(1);
+    expect(posts[0]).toMatchObject({ method: 'POST', path: 'employee_list' });
+    expect(posts[0].body).toMatchObject({
+      emp_name: 'Meera b',
+      emp_lname: 'Iyer',
+      emp_email: 'meera@fixture.com',
+      emp_mobile: '9000011111',
+      emp_option: 'Corporate',
+      emp_organisationname: 'Fixture Corp',
+      emp_password: '',
+      emp_otp: '',
+      status: 'Active',
+      reg_date: '25-10-2026',
+      created_at: '25-10-2026 11:30:00 AM',
+    });
+    expect(posts[0].body).not.toHaveProperty('emp_id');
+    expect(session.user).toMatchObject({ firstName: 'Meera b', mobile: '+919000011111', userType: 'corporate', companyName: 'Fixture Corp' });
+
+    // The new account works like any other: it can sign in again later.
+    w.state.now += 2 * 60 * 1000;
+    expect((await w.signIn('+919000011111')).user.id).toBe(session.user.id);
+  });
+
+  it('finds the new row when the server returns its id', async () => {
+    const w = createWorld({ postReturnsId: true });
+    const req = await w.api.auth.register({ ...details, userType: 'individual', companyName: null });
+    const session = await w.api.auth.verifyOtp(req.requestId, w.lastCode());
+    expect(session.user).toMatchObject({ id: '104', userType: 'individual', companyName: null });
+  });
+
+  it('refuses a number that already has an account, or that the team switched off', async () => {
+    const w = createWorld();
+    expect((await apiError(w.api.auth.register({ ...details, mobile: '+919876543210' }))).code).toBe('ALREADY_REGISTERED');
+    expect((await apiError(w.api.auth.register({ ...details, mobile: '+919000000003' }))).code).toBe('ACCOUNT_INACTIVE');
+    expect(w.sms).toHaveLength(0);
+    expect(w.writes()).toHaveLength(0);
+  });
+
+  it('checks the details before sending an SMS', async () => {
+    const w = createWorld();
+    expect((await apiError(w.api.auth.register({ ...details, firstName: '<>' }))).code).toBe('VALIDATION');
+    expect((await apiError(w.api.auth.register({ ...details, email: 'nope' }))).code).toBe('VALIDATION');
+    expect((await apiError(w.api.auth.register({ ...details, companyName: ' ' }))).code).toBe('VALIDATION');
+    expect((await apiError(w.api.auth.register({ ...details, mobile: '12345' }))).code).toBe('INVALID_MOBILE');
+    expect(w.sms).toHaveLength(0);
+  });
+
+  it('does not create the account with a wrong code', async () => {
+    const w = createWorld();
+    const req = await w.api.auth.register(details);
+    expect((await apiError(w.api.auth.verifyOtp(req.requestId, '000000'))).code).toBe('OTP_INVALID');
+    expect(w.writes()).toHaveLength(0);
+    expect(w.db.employee_list).toHaveLength(3);
+  });
+
+  it('can be retried after a dropped connection without creating a second row', async () => {
+    const w = createWorld();
+    const req = await w.api.auth.register(details);
+    const code = w.lastCode();
+    w.state.failNext = 'network';
+    expect((await apiError(w.api.auth.verifyOtp(req.requestId, code))).kind).toBe('network');
+    const session = await w.api.auth.verifyOtp(req.requestId, code);
+    expect(session.user.mobile).toBe('+919000011111');
+    expect(w.db.employee_list.filter((r) => r.emp_mobile === '9000011111')).toHaveLength(1);
+  });
+
+  it('shares the SMS cooldown with sign-in', async () => {
+    const w = createWorld();
+    await w.api.auth.register(details);
+    expect((await apiError(w.api.auth.register(details))).code).toBe('OTP_COOLDOWN');
+    expect(w.sms).toHaveLength(1);
+  });
+});
+
+describe('rate limits kept on the device', () => {
+  const input = (slotStart: string) => ({
+    counsellorId: '7', slotStart, mode: 'video' as const, issueId: 'Anxiety Management', language: null, notes: 'First session',
+  });
+  const signup = (n: number) => ({
+    userType: 'individual' as const,
+    firstName: 'New',
+    lastName: null,
+    email: `new${n}@example.com`,
+    mobile: `+9190000200${String(n).padStart(2, '0')}`,
+    companyName: null,
+    employeeId: null,
+  });
+
+  it('keeps the resend cooldown after the app is closed and reopened', async () => {
+    const w = createWorld();
+    await w.api.auth.requestOtp('+919876543210');
+    w.restart();
+    const err = await apiError(w.api.auth.requestOtp('+919876543210'));
+    expect(err.code).toBe('OTP_COOLDOWN');
+    expect(err.retryAfterSeconds).toBe(60);
+    expect(w.sms).toHaveLength(1);
+  });
+
+  it('caps the SMS one device can trigger across different numbers', async () => {
+    const w = createWorld();
+    for (let i = 0; i < OTP_DEVICE_MAX_PER_HOUR; i++) await w.api.auth.register(signup(i));
+    const err = await apiError(w.api.auth.register(signup(50)));
+    expect(err.code).toBe('OTP_LIMIT');
+    expect(err.retryAfterSeconds).toBe(3600);
+    expect(w.sms).toHaveLength(OTP_DEVICE_MAX_PER_HOUR);
+
+    // An hour later the hourly cap has cleared, but the daily cap still applies.
+    for (let sent = OTP_DEVICE_MAX_PER_HOUR, n = 60; sent < OTP_DEVICE_MAX_PER_DAY; ) {
+      w.state.now += 3600 * 1000 + 1000;
+      for (let i = 0; i < OTP_DEVICE_MAX_PER_HOUR && sent < OTP_DEVICE_MAX_PER_DAY; i++, sent++) await w.api.auth.register(signup(n++));
+    }
+    w.state.now += 3600 * 1000 + 1000;
+    expect((await apiError(w.api.auth.register(signup(99)))).code).toBe('OTP_LIMIT');
+    expect(w.sms).toHaveLength(OTP_DEVICE_MAX_PER_DAY);
+  });
+
+  it('pauses code entry after too many wrong codes, even across new requests and restarts', async () => {
+    const w = createWorld();
+    let req = await w.api.auth.requestOtp('+919876543210');
+    for (let i = 0; i < OTP_WRONG_MAX; i++) {
+      if (i > 0 && i % 4 === 0) {
+        w.state.now += 61 * 1000;
+        req = await w.api.auth.requestOtp('+919876543210');
+      }
+      expect((await apiError(w.api.auth.verifyOtp(req.requestId, '000000'))).code).toBe('OTP_INVALID');
+    }
+    const code = w.lastCode();
+    const locked = await apiError(w.api.auth.verifyOtp(req.requestId, code));
+    expect(locked.code).toBe('OTP_LOCKED');
+    expect(locked.kind).toBe('rate_limited');
+
+    w.restart();
+    w.state.now += 61 * 1000;
+    const again = await w.api.auth.requestOtp('+919876543210');
+    expect((await apiError(w.api.auth.verifyOtp(again.requestId, w.lastCode()))).code).toBe('OTP_LOCKED');
+
+    w.state.now += 15 * 60 * 1000;
+    const fresh = await w.api.auth.requestOtp('+919876543210');
+    expect((await w.api.auth.verifyOtp(fresh.requestId, w.lastCode())).user.id).toBe('101');
+  });
+
+  it('limits how many bookings one device can make in an hour', async () => {
+    const w = createWorld();
+    await w.signIn();
+    for (let i = 0; i < WRITE_LIMITS.booking.max; i++) {
+      await w.api.bookings.create(input(istToIso('2026-10-29', (12 + i) * 60)), `k${i}`);
+    }
+    const err = await apiError(w.api.bookings.create(input(istToIso('2026-10-30', 12 * 60)), 'k-last'));
+    expect(err.code).toBe('RATE_LIMITED');
+    expect(err.kind).toBe('rate_limited');
+    expect(w.calls.filter((c) => c.method === 'POST')).toHaveLength(WRITE_LIMITS.booking.max);
+
+    w.state.now += 3600 * 1000 + 1000;
+    await expect(w.api.bookings.create(input(istToIso('2026-10-30', 12 * 60)), 'k-last')).resolves.toBeTruthy();
+  });
+
+  it('limits how many accounts one device can create in a day', async () => {
+    const w = createWorld();
+    for (let i = 0; i < WRITE_LIMITS.signup.max; i++) {
+      const req = await w.api.auth.register(signup(i));
+      await w.api.auth.verifyOtp(req.requestId, w.lastCode());
+    }
+    expect((await apiError(w.api.auth.register(signup(40)))).code).toBe('RATE_LIMITED');
+    expect(w.calls.filter((c) => c.method === 'POST')).toHaveLength(WRITE_LIMITS.signup.max);
+  });
+
+  it('strips markup from text a person types before it is stored', async () => {
+    const w = createWorld();
+    await w.signIn();
+    await w.api.bookings.create({ ...input(istToIso('2026-10-29', 12 * 60)), notes: '<script>alert(1)</script> call\u0000 me' }, 'k');
+    expect(w.calls.find((c) => c.method === 'POST')!.body!.appointment_notes).toBe('scriptalert(1)/script call me');
+  });
+
+  it('starts clean when the stored history is damaged', async () => {
+    const w = createWorld();
+    w.corruptLimits({ sms: 'x', device: [1, 'a', null], wrong: {}, writes: [] });
+    await expect(w.api.auth.requestOtp('+919876543210')).resolves.toBeTruthy();
   });
 });

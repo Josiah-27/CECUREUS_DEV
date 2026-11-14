@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ComponentRef } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ApiError, friendlyMessage } from '@/api/errors';
@@ -37,7 +37,7 @@ export function OtpEntry({ destination, initial, onVerify, onResend, onChangeDes
   const [resending, setResending] = useState(false);
   const expiry = useCountdown(initial.expiresInSeconds);
   const resend = useCountdown(initial.resendAfterSeconds);
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<ComponentRef<typeof TextInput>>(null);
   const expired = expiry.remaining === 0;
 
   async function submit(value = code) {

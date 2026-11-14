@@ -23,7 +23,7 @@ const ICONS: Record<string, LucideIcon> = {
 };
 
 /** Bottom navigation from the design, with the raised Ally button in the centre. */
-export function CecureTabBar({ state, descriptors, navigation }: TabBarProps) {
+export function CecureTabBar({ state, descriptors, emitter, navigateToTab }: TabBarProps) {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
@@ -36,8 +36,8 @@ export function CecureTabBar({ state, descriptors, navigation }: TabBarProps) {
         const color = focused ? colors.primary : colors.textMuted;
 
         function onPress() {
-          const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-          if (!focused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
+          const event = emitter.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+          if (!focused && !event.defaultPrevented) navigateToTab(route.key);
         }
 
         return (

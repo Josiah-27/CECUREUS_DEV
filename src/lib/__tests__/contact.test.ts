@@ -24,7 +24,7 @@ describe('actions', () => {
 
   it('asks for confirmation and does not dial until the user confirms', () => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     confirmAndCallHelpline();
     expect(open).not.toHaveBeenCalled();
     const buttons = alert.mock.calls[0][2]!;
@@ -35,7 +35,7 @@ describe('actions', () => {
 
   it('cancelling the confirmation never opens the dialer', () => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     confirmAndCallHelpline();
     alert.mock.calls[0][2]![0].onPress?.();
     expect(open).not.toHaveBeenCalled();
@@ -49,7 +49,7 @@ describe('actions', () => {
   });
 
   it('opens WhatsApp and falls back with the number on failure', async () => {
-    const open = jest.spyOn(Linking, 'openURL').mockResolvedValueOnce(true);
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValueOnce(undefined);
     await expect(openWhatsApp('Hello')).resolves.toBe(true);
     expect(open).toHaveBeenCalledWith('https://wa.me/917200500221?text=Hello');
 

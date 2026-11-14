@@ -100,7 +100,7 @@ export default function ArticlesScreen() {
             {moreError ? <ErrorState error={moreError} /> : null}
             <Button testID="load-more" variant="outline" label="Load more" onPress={() => void loadMore()} loading={loadingMore} />
           </View>
-        ) : null
+        ) : undefined
       }
     />
   );

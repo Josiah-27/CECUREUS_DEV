@@ -40,6 +40,58 @@ export function toUser(row: Row) {
   };
 }
 
+/** Free text typed by a person: no control characters or angle brackets (the admin panel renders it as HTML). */
+export function cleanText(value: unknown, max: number): string {
+  return str(value).replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+/**
+ * New employee_list row for a person who signed up in the app, in the same format the existing
+ * rows use (every column gets a value; unknown ones are empty strings).
+ */
+export function newEmployeeRow(input: {
+  mobileE164: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  userType: 'corporate' | 'individual';
+  companyName: string;
+  /** "DD-MM-YYYY hh:mm:ss AM" (legacyTimestamp). */
+  timestamp: string;
+}): Row {
+  return {
+    emp_otp: '',
+    emp_companyname: '',
+    emp_name: input.firstName,
+    emp_lname: input.lastName,
+    emp_companyid: '',
+    emp_email: input.email,
+    emp_password: '',
+    emp_mobile: input.mobileE164.replace(/^\+91/, ''),
+    emp_familyoption: 'Self',
+    emp_dob: '',
+    emp_age: '',
+    emp_gender: '',
+    emp_country: '',
+    emp_option: input.userType === 'corporate' ? 'Corporate' : 'Individual',
+    emp_location: '',
+    emp_jobtitle: '',
+    emp_department: '',
+    emp_doj: '',
+    emp_agree: '',
+    emp_organisationname: input.userType === 'corporate' ? input.companyName : '',
+    emp_maritalstatus: '',
+    emp_emargenumber: '',
+    plan_date: '',
+    reg_date: input.timestamp.slice(0, 10),
+    emp_role: '',
+    created_at: input.timestamp,
+    updated_at: input.timestamp,
+    status: 'Active',
+    position: '0',
+  };
+}
+
 // ---------- doctor_list ----------
 
 export const isActiveDoctor = (row: Row) => lower(row.status) === 'active' && !!str(row.doc_name);

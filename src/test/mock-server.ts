@@ -196,6 +196,9 @@ export function createMockServer(opts: MockServerOptions = {}) {
 
   const nextEmpId = () => state.employee_list.reduce((max, r) => Math.max(max, r.emp_id), 100) + 1;
   const isActive = (r: EmployeeRow) => r.status.toLowerCase() === 'active';
+  /** A sign-up whose SMS code has not been verified yet. */
+  const SIGNUP_STATUS = 'Unverified';
+  const isSignup = (r: EmployeeRow) => r.status === SIGNUP_STATUS;
   const activeRows = () => state.employee_list.filter(isActive);
   const touch = (row: EmployeeRow) => {
     row.updated_at = dbDate(now());
@@ -288,7 +291,7 @@ export function createMockServer(opts: MockServerOptions = {}) {
     if (method === 'POST' && path === 'auth/otp/request') {
       const mobile = normalizeMobile(body?.mobile);
       if (!mobile) return fail(422, 'Enter a valid 10-digit Indian mobile number.', 'INVALID_MOBILE');
-      const matches = state.employee_list.filter((r) => normalizeMobile(r.emp_mobile) === mobile);
+      const matches = state.employee_list.filter((r) => normalizeMobile(r.emp_mobile) === mobile && !isSignup(r));
       if (!matches.length) return fail(422, 'This number is not registered with CecureUs yet.', 'NOT_REGISTERED');
       const row = matches.filter(isActive).sort((a, b) => b.emp_id - a.emp_id)[0];
       if (!row) {
@@ -296,9 +299,40 @@ export function createMockServer(opts: MockServerOptions = {}) {
       }
       return issueOtp(row, 'phone', mobile);
     }
+    // ---- Sign up: details + mobile number → SMS code → the account is created when the code is verified ----
+    if (method === 'POST' && path === 'auth/register') {
+      const mobile = normalizeMobile(body?.mobile);
+      if (!mobile) return fail(422, 'Enter a valid 10-digit Indian mobile number.', 'INVALID_MOBILE');
+      const firstName = String(body?.firstName ?? '').trim();
+      const email = String(body?.email ?? '').trim().toLowerCase();
+      const corporate = body?.userType === 'corporate';
+      const company = corporate ? String(body?.companyName ?? '').trim() : '';
+      if (!firstName) return fail(422, 'First name is required.', 'VALIDATION');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail(422, 'Enter a valid email address.', 'VALIDATION');
+      if (corporate && !company) return fail(422, 'Company name is required.', 'VALIDATION');
+      const matches = state.employee_list.filter((r) => normalizeMobile(r.emp_mobile) === mobile);
+      if (matches.some(isActive)) {
+        return fail(409, 'This number already has a CecureUs account. Please sign in instead.', 'ALREADY_REGISTERED');
+      }
+      if (matches.some((r) => !isSignup(r))) {
+        return fail(422, 'Your account is not active. Please contact CecureUs at connect@cecureus.com.', 'ACCOUNT_INACTIVE');
+      }
+      // Mock: the unverified sign-up is parked in a row that no one can sign in to until the code is verified.
+      const row = matches[0] ?? addEmployee({ status: SIGNUP_STATUS });
+      Object.assign(row, {
+        emp_name: firstName,
+        emp_lname: String(body?.lastName ?? '').trim(),
+        emp_email: email,
+        emp_mobile: mobile.replace(/^\+91/, ''),
+        emp_option: corporate ? 'Corporate' : 'Individual',
+        emp_companyname: company,
+      });
+      return issueOtp(row, 'phone', mobile);
+    }
     if (method === 'POST' && path === 'auth/otp/verify') {
       const result = checkOtp(body?.requestId, body?.otp, 'phone');
       if (result.error) return result.error;
+      if (isSignup(result.row)) result.row.status = 'Active';
       if (!isActive(result.row)) {
         return fail(422, 'Your account is not active. Please contact CecureUs at connect@cecureus.com.', 'ACCOUNT_INACTIVE');
       }

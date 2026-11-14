@@ -1,4 +1,4 @@
-import { act, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
+import { cleanup, fireEvent, renderRouter, screen, waitFor } from 'expo-router/testing-library';
 import { Alert } from 'react-native';
 
 import { APP_DIR, installMockServer, resetDeviceStorage, signInDirect } from '@/test/harness';
@@ -15,31 +15,35 @@ beforeEach(async () => {
   await signInDirect(server, 'corporate');
 });
 
-afterEach(() => jest.useRealTimers());
+// Unmount while the fake clock is still installed, so nothing from this test is left waiting on it.
+afterEach(async () => {
+  await cleanup();
+  jest.useRealTimers();
+});
 
 const bookingPosts = () => server.state.calls.filter((c) => c.method === 'POST' && c.path === 'bookings');
 
 async function selectSlotAndMode(mode: 'audio' | 'video' | 'chat' = 'video') {
-  renderRouter(APP_DIR, { initialUrl: '/book/1' });
-  fireEvent.press(await screen.findByTestId(`day-${SLOT_DAY}`));
-  fireEvent.press(await screen.findByTestId(`slot-${SLOT}`));
-  fireEvent.press(screen.getByTestId(`mode-${mode}`));
+  await renderRouter(APP_DIR, { initialUrl: '/book/1' });
+  await fireEvent.press(await screen.findByTestId(`day-${SLOT_DAY}`));
+  await fireEvent.press(await screen.findByTestId(`slot-${SLOT}`));
+  await fireEvent.press(screen.getByTestId(`mode-${mode}`));
 }
 
 describe('booking workflow', () => {
   it('keeps Confirm disabled until a slot and mode are chosen', async () => {
-    renderRouter(APP_DIR, { initialUrl: '/book/1' });
+    await renderRouter(APP_DIR, { initialUrl: '/book/1' });
     expect(await screen.findByTestId('confirm-booking')).toBeDisabled();
-    fireEvent.press(await screen.findByTestId(`slot-${SLOT}`));
+    await fireEvent.press(await screen.findByTestId(`slot-${SLOT}`));
     expect(screen.getByTestId('confirm-booking')).toBeDisabled();
-    fireEvent.press(screen.getByTestId('mode-audio'));
+    await fireEvent.press(screen.getByTestId('mode-audio'));
     expect(screen.getByTestId('confirm-booking')).toBeEnabled();
   });
 
   it('books a session, shows confirmation only after the server confirms, and triggers exactly one SMS', async () => {
     await selectSlotAndMode('video');
     expect(screen.getByTestId('covered-notice')).toBeOnTheScreen();
-    fireEvent.press(screen.getByTestId('confirm-booking'));
+    await fireEvent.press(screen.getByTestId('confirm-booking'));
 
     expect(await screen.findByText('Booking Confirmed!')).toBeOnTheScreen();
     expect(screen.getByText('Test Counsellor One')).toBeOnTheScreen();
@@ -56,7 +60,7 @@ describe('booking workflow', () => {
     const availabilityCalls = () => server.state.calls.filter((c) => c.path.endsWith('/availability')).length;
     const before = availabilityCalls();
     server.state.openSlots.delete(SLOT); // another user books it first
-    fireEvent.press(screen.getByTestId('confirm-booking'));
+    await fireEvent.press(screen.getByTestId('confirm-booking'));
 
     expect(await screen.findByText(/just booked by someone else/)).toBeOnTheScreen();
     expect(screen.queryByText('Booking Confirmed!')).toBeNull();
@@ -79,11 +83,11 @@ describe('booking workflow', () => {
     }) as typeof fetch;
 
     await selectSlotAndMode();
-    fireEvent.press(screen.getByTestId('confirm-booking'));
+    await fireEvent.press(screen.getByTestId('confirm-booking'));
     expect(await screen.findByText(/Your booking was not confirmed/)).toBeOnTheScreen();
     expect(screen.queryByText('Booking Confirmed!')).toBeNull();
 
-    fireEvent.press(screen.getByTestId('confirm-booking'));
+    await fireEvent.press(screen.getByTestId('confirm-booking'));
     expect(await screen.findByText('Booking Confirmed!')).toBeOnTheScreen();
 
     const posts = bookingPosts();
@@ -96,8 +100,8 @@ describe('booking workflow', () => {
   it('ignores a double tap on Confirm', async () => {
     await selectSlotAndMode();
     const button = screen.getByTestId('confirm-booking');
-    fireEvent.press(button);
-    fireEvent.press(button);
+    await fireEvent.press(button);
+    await fireEvent.press(button);
     expect(await screen.findByText('Booking Confirmed!')).toBeOnTheScreen();
     expect(bookingPosts()).toHaveLength(1);
   });
@@ -114,7 +118,7 @@ describe('booking workflow', () => {
         },
       },
     };
-    fireEvent.press(screen.getByTestId('confirm-booking'));
+    await fireEvent.press(screen.getByTestId('confirm-booking'));
     expect(await screen.findByText('Booking Request Received')).toBeOnTheScreen();
     expect(screen.queryByText('Booking Confirmed!')).toBeNull();
   });
@@ -122,28 +126,28 @@ describe('booking workflow', () => {
   it('shows an error (not a confirmation) when the server fails', async () => {
     await selectSlotAndMode();
     server.state.failNext = { status: 500, body: { status: false, message: 'boom' } };
-    fireEvent.press(screen.getByTestId('confirm-booking'));
+    await fireEvent.press(screen.getByTestId('confirm-booking'));
     expect(await screen.findByTestId('booking-error')).toHaveTextContent(/Something went wrong/);
     expect(screen.queryByText('Booking Confirmed!')).toBeNull();
   });
 
   it('shows an empty state when the counsellor has no availability', async () => {
     server.state.openSlots.clear();
-    renderRouter(APP_DIR, { initialUrl: '/book/1' });
+    await renderRouter(APP_DIR, { initialUrl: '/book/1' });
     expect(await screen.findByText('No available slots')).toBeOnTheScreen();
     expect(screen.getByTestId('confirm-booking')).toBeDisabled();
   });
 
   it('hides slots that have already started (stale availability)', async () => {
     jest.setSystemTime(new Date('2026-11-02T05:00:00.000Z')); // after 04:30Z slot starts
-    renderRouter(APP_DIR, { initialUrl: '/book/1' });
+    await renderRouter(APP_DIR, { initialUrl: '/book/1' });
     await screen.findByTestId('confirm-booking');
     await waitFor(() => expect(screen.queryByTestId('slot-2026-11-02T05:30:00.000Z')).toBeOnTheScreen());
     expect(screen.queryByTestId(`slot-${SLOT}`)).toBeNull();
   });
 
   it('only offers the session modes the counsellor supports', async () => {
-    renderRouter(APP_DIR, { initialUrl: '/book/2' });
+    await renderRouter(APP_DIR, { initialUrl: '/book/2' });
     expect(await screen.findByTestId('mode-audio')).toBeOnTheScreen();
     expect(screen.getByTestId('mode-video')).toBeOnTheScreen();
     expect(screen.queryByTestId('mode-chat')).toBeNull();
@@ -152,7 +156,7 @@ describe('booking workflow', () => {
   it('does not show the corporate coverage notice to individual users', async () => {
     resetDeviceStorage();
     await signInDirect(server, 'individual', 'solo@example.com');
-    renderRouter(APP_DIR, { initialUrl: '/book/1' });
+    await renderRouter(APP_DIR, { initialUrl: '/book/1' });
     await screen.findByTestId('confirm-booking');
     expect(screen.queryByTestId('covered-notice')).toBeNull();
   });
@@ -162,19 +166,17 @@ describe('booking history and cancellation', () => {
   it('lists the booking under Upcoming and cancels it with a reason', async () => {
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     await selectSlotAndMode();
-    fireEvent.press(screen.getByTestId('confirm-booking'));
-    fireEvent.press(await screen.findByTestId('go-to-sessions'));
+    await fireEvent.press(screen.getByTestId('confirm-booking'));
+    await fireEvent.press(await screen.findByTestId('go-to-sessions'));
 
     const id = server.state.bookings[0].id;
     expect(await screen.findByTestId(`booking-${id}`)).toBeOnTheScreen();
     expect(screen.getByText('Confirmed')).toBeOnTheScreen();
 
-    fireEvent.press(screen.getByTestId(`cancel-${id}`));
+    await fireEvent.press(screen.getByTestId(`cancel-${id}`));
     expect(screen.getByTestId('confirm-cancel')).toBeDisabled();
-    fireEvent.press(screen.getByText('Schedule conflict'));
-    await act(async () => {
-      fireEvent.press(screen.getByTestId('confirm-cancel'));
-    });
+    await fireEvent.press(screen.getByText('Schedule conflict'));
+    await fireEvent.press(screen.getByTestId('confirm-cancel'));
 
     await waitFor(() => expect(server.state.bookings[0].status).toBe('cancelled'));
     const cancel = server.state.calls.find((c) => c.path === `bookings/${id}/cancel`);

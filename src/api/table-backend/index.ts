@@ -7,10 +7,10 @@
  * is no longer used. See docs/TABLE_BACKEND.md for the rules it enforces and its limits.
  *
  * Tables used:
- *   employee_list        read (sign-in lookup, profile) · PUT (profile edit, deletion request)
+ *   employee_list        read (sign-in lookup, profile) · POST (new sign-up, after the number is
+ *                        verified by SMS code) · PUT (profile edit, deletion request)
  *   doctor_list          read only (sanitised counsellor directory)
  *   booking_appointment  read · POST (book) · PUT (cancel)
- * New accounts are NOT created here — sign-up requests go to the CecureUs team on WhatsApp.
  */
 import { getRandomValues, randomUUID } from 'expo-crypto';
 
@@ -18,11 +18,13 @@ import { readJson, writeJson } from '@/local/secure-json-store';
 
 import {
   bookingMinutes,
+  cleanText,
   expertiseOf,
   isActiveDoctor,
   isActiveEmployee,
   isCancelledBooking,
   newBookingRow,
+  newEmployeeRow,
   normalizeDbMobile,
   overlaps,
   str,
@@ -40,6 +42,23 @@ export const OTP_RESEND_MS = 60 * 1000;
 export const OTP_MAX_ATTEMPTS = 5;
 /** SMS cost protection: at most this many codes per number per hour. */
 export const OTP_MAX_PER_HOUR = 5;
+/** Across every number tried from this device (protects SMS credits from one phone cycling numbers). */
+export const OTP_DEVICE_MAX_PER_HOUR = 8;
+export const OTP_DEVICE_MAX_PER_DAY = 20;
+/** Wrong codes from this device, across all requests, before code entry is paused. */
+export const OTP_WRONG_MAX = 10;
+export const OTP_WRONG_WINDOW_MS = 15 * 60 * 1000;
+/** How many times this device may do each kind of write within the window. */
+export const WRITE_LIMITS = {
+  booking: { max: 5, windowMs: 3600 * 1000, message: 'You have made several bookings in a short time. Please try again later.' },
+  cancel: { max: 10, windowMs: 3600 * 1000, message: 'You have cancelled several sessions in a short time. Please try again later.' },
+  profile: { max: 10, windowMs: 3600 * 1000, message: 'You have changed your profile several times. Please try again later.' },
+  signup: { max: 3, windowMs: 24 * 3600 * 1000, message: 'Too many accounts have been created from this device. Please try again tomorrow.' },
+  deletion: { max: 3, windowMs: 24 * 3600 * 1000, message: 'Please try again tomorrow, or contact CecureUs at connect@cecureus.com.' },
+} as const;
+type WriteKind = keyof typeof WRITE_LIMITS;
+const HOUR_MS = 3600 * 1000;
+const DAY_MS = 24 * HOUR_MS;
 export const SESSION_TTL_MS = 30 * 24 * 3600 * 1000;
 export const PAGE_SIZE = 10;
 /** Bookable hours in IST: first slot 10:00 AM, last slot 8:00–9:00 PM (matches existing bookings). */
@@ -52,9 +71,41 @@ const MAX_AVAILABILITY_DAYS = 31;
 const LANGUAGES = ['English', 'Hindi', 'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Bengali', 'Marathi', 'Gujarati'];
 
 type Session = { empId: string; expiresAt: number };
+/** Details of a sign-up that is waiting for its SMS code to be verified. */
+type Signup = { firstName: string; lastName: string; email: string; userType: 'corporate' | 'individual'; companyName: string };
+type PendingOtp = { empId: string | null; signup: Signup | null; mobile: string; code: string; issuedAt: number; attempts: number };
+const INACTIVE_MESSAGE = 'Your account is not active. Please contact CecureUs at connect@cecureus.com.';
 type Sessions = Record<string, Session>;
 
 export type SessionStorage = { read(): Promise<Sessions>; write(sessions: Sessions): Promise<void> };
+
+/**
+ * Rate-limit history (times only, never codes). It is kept in the device keystore so that closing
+ * and reopening the app does not reset the limits.
+ */
+export type Limits = {
+  /** SMS send times per number, last hour. */
+  sms: Record<string, number[]>;
+  /** Every SMS send time from this device, last 24 hours. */
+  device: number[];
+  /** Wrong-code times from this device. */
+  wrong: number[];
+  /** Write times per kind. */
+  writes: Record<string, number[]>;
+};
+export type LimitStorage = { read(): Promise<unknown>; write(limits: Limits): Promise<void> };
+
+const times = (v: unknown): number[] =>
+  Array.isArray(v) ? v.filter((n): n is number => typeof n === 'number' && Number.isFinite(n)).slice(-200) : [];
+const timesByKey = (v: unknown): Record<string, number[]> =>
+  v && typeof v === 'object' && !Array.isArray(v)
+    ? Object.fromEntries(Object.entries(v as Record<string, unknown>).slice(0, 200).map(([k, t]) => [k, times(t)]))
+    : {};
+/** Stored data is never trusted to have the right shape. */
+function toLimits(raw: unknown): Limits {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  return { sms: timesByKey(r.sms), device: times(r.device), wrong: times(r.wrong), writes: timesByKey(r.writes) };
+}
 
 export type TableBackendOptions = {
   /** Base URL the API client is configured with (requests are matched relative to it). */
@@ -65,6 +116,7 @@ export type TableBackendOptions = {
   /** Network for the table API and SMS gateway (defaults to global fetch). */
   fetchImpl?: typeof fetch;
   sessionStorage?: SessionStorage;
+  limitStorage?: LimitStorage;
   now?: () => number;
   generateOtp?: () => string;
   generateToken?: () => string;
@@ -78,6 +130,9 @@ const fail = (status: number, message: string, code: string, retryAfter?: number
   body: { status: false, message, code },
   retryAfter,
 });
+
+/** The number belongs to an account the team has switched off. */
+class InactiveAccount extends Error {}
 
 function secureOtp(): string {
   const [n] = getRandomValues(new Uint32Array(1));
@@ -99,18 +154,60 @@ function defaultSessionStorage(): SessionStorage {
   };
 }
 
+function defaultLimitStorage(): LimitStorage {
+  const KEY = 'cecureus.table.limits.v1';
+  return {
+    read: () => readJson<unknown>(KEY, null),
+    write: (limits) => writeJson(KEY, limits),
+  };
+}
+
 export function createTableBackend(opts: TableBackendOptions) {
   const now = opts.now ?? (() => Date.now());
   const generateOtp = opts.generateOtp ?? secureOtp;
   const generateToken = opts.generateToken ?? (() => `${randomUUID()}${randomUUID()}`.replace(/-/g, ''));
   const hours = opts.slotHours ?? DEFAULT_SLOT_HOURS;
   const storage = opts.sessionStorage ?? defaultSessionStorage();
+  const limitStorage = opts.limitStorage ?? defaultLimitStorage();
   const net: typeof fetch = (i, init) => (opts.fetchImpl ?? globalThis.fetch)(i, init);
   const tables = createTableApi({ baseUrl: opts.tableApiUrl, fetchImpl: net });
 
   // ---- in-memory state (OTP codes never leave memory and are never written to the tables) ----
-  const otps = new Map<string, { empId: string; mobile: string; code: string; issuedAt: number; attempts: number }>();
-  const smsSent = new Map<string, number[]>();
+  const otps = new Map<string, PendingOtp>();
+
+  // ---- rate limits (persisted; a time set in the future still counts, so winding the clock back does not help) ----
+  let limits: Limits | null = null;
+  const within = (list: number[], windowMs: number) => list.filter((at) => now() - at < windowMs);
+  async function loadLimits(): Promise<Limits> {
+    if (!limits) limits = toLimits(await limitStorage.read().catch(() => null));
+    const l = limits;
+    l.device = within(l.device, DAY_MS);
+    l.wrong = within(l.wrong, OTP_WRONG_WINDOW_MS);
+    for (const [k, v] of Object.entries(l.sms)) {
+      const kept = within(v, HOUR_MS);
+      if (kept.length) l.sms[k] = kept;
+      else delete l.sms[k];
+    }
+    for (const k of Object.keys(l.writes)) l.writes[k] = within(l.writes[k], DAY_MS);
+    return l;
+  }
+  async function saveLimits() {
+    if (limits) await limitStorage.write(limits).catch(() => undefined);
+  }
+  /** Seconds until the oldest of `list` leaves the window (at least 1). */
+  const waitFor = (list: number[], windowMs: number) => Math.max(1, Math.ceil((windowMs - (now() - Math.min(...list))) / 1000));
+
+  /** Returns the 429 to send when this device has done `kind` too often; otherwise null. */
+  async function writeBlocked(kind: WriteKind): Promise<Result | null> {
+    const rule = WRITE_LIMITS[kind];
+    const recent = within((await loadLimits()).writes[kind] ?? [], rule.windowMs);
+    return recent.length >= rule.max ? fail(429, rule.message, 'RATE_LIMITED', waitFor(recent, rule.windowMs)) : null;
+  }
+  async function recordWrite(kind: WriteKind) {
+    const l = await loadLimits();
+    l.writes[kind] = [...(l.writes[kind] ?? []), now()];
+    await saveLimits();
+  }
   let sessions: Sessions | null = null;
 
   async function loadSessions(): Promise<Sessions> {
@@ -163,36 +260,32 @@ export function createTableBackend(opts: TableBackendOptions) {
 
   // ---------------- routes ----------------
 
-  async function requestOtp(body: Row, signal?: AbortSignal): Promise<Result> {
-    const mobile = normalizeDbMobile(body.mobile);
-    if (!mobile) return fail(422, 'Enter a valid 10-digit Indian mobile number.', 'INVALID_MOBILE');
-
+  /** Cooldown and hourly cap for one number; returns the 429 to send, or the recent send times. */
+  async function smsAllowance(mobile: string): Promise<{ blocked: Result } | { sent: number[] }> {
     const t = now();
-    const sent = (smsSent.get(mobile) ?? []).filter((at) => t - at < 3600 * 1000);
+    const l = await loadLimits();
+    const sent = l.sms[mobile] ?? [];
     const last = sent[sent.length - 1];
     if (last !== undefined && t - last < OTP_RESEND_MS) {
       const wait = Math.ceil((OTP_RESEND_MS - (t - last)) / 1000);
-      return fail(429, 'Please wait before requesting another code.', 'OTP_COOLDOWN', wait);
+      return { blocked: fail(429, 'Please wait before requesting another code.', 'OTP_COOLDOWN', wait) };
     }
     if (sent.length >= OTP_MAX_PER_HOUR) {
       const wait = Math.ceil((3600 * 1000 - (t - sent[0])) / 1000);
-      return fail(429, 'Too many codes requested. Please try again later.', 'OTP_LIMIT', wait);
+      return { blocked: fail(429, 'Too many codes requested. Please try again later.', 'OTP_LIMIT', wait) };
     }
+    const deviceHour = within(l.device, HOUR_MS);
+    if (deviceHour.length >= OTP_DEVICE_MAX_PER_HOUR) {
+      return { blocked: fail(429, 'Too many codes requested from this device. Please try again later.', 'OTP_LIMIT', waitFor(deviceHour, HOUR_MS)) };
+    }
+    if (l.device.length >= OTP_DEVICE_MAX_PER_DAY) {
+      return { blocked: fail(429, 'Too many codes requested from this device today. Please try again tomorrow.', 'OTP_LIMIT', waitFor(l.device, DAY_MS)) };
+    }
+    return { sent };
+  }
 
-    // Always read fresh: the team may have just added or activated this person.
-    const matches = (await tables.list('employee_list', signal)).filter((r) => normalizeDbMobile(r.emp_mobile) === mobile);
-    const active = matches.filter(isActiveEmployee).sort((a, b) => Number(b.emp_id) - Number(a.emp_id));
-    if (!matches.length) {
-      return fail(422, 'This number is not registered with CecureUs yet.', 'NOT_REGISTERED');
-    }
-    if (!active.length) {
-      return fail(
-        422,
-        'Your account is not active. Please contact CecureUs at connect@cecureus.com.',
-        'ACCOUNT_INACTIVE',
-      );
-    }
-
+  /** Sends a fresh code to the number and remembers what it is for (sign-in or a new sign-up). */
+  async function issueOtp(mobile: string, sent: number[], target: Pick<PendingOtp, 'empId' | 'signup'>): Promise<Result> {
     const code = generateOtp();
     try {
       await sendOtpSms(opts.sms, mobile, code, net);
@@ -204,16 +297,98 @@ export function createTableBackend(opts: TableBackendOptions) {
     }
     for (const [id, o] of otps) if (o.mobile === mobile) otps.delete(id);
     const requestId = generateToken();
-    otps.set(requestId, { empId: str(active[0].emp_id), mobile, code, issuedAt: t, attempts: 0 });
-    smsSent.set(mobile, [...sent, t]);
+    otps.set(requestId, { ...target, mobile, code, issuedAt: now(), attempts: 0 });
+    const l = await loadLimits();
+    l.sms[mobile] = [...sent, now()];
+    l.device = [...l.device, now()];
+    await saveLimits();
     return ok({ requestId, expiresInSeconds: OTP_TTL_MS / 1000, resendAfterSeconds: OTP_RESEND_MS / 1000 });
   }
 
+  /** employee_list rows for a number, read fresh: the team may have just added or changed this person. */
+  async function employeesWithMobile(mobile: string, signal?: AbortSignal) {
+    const matches = (await tables.list('employee_list', signal)).filter((r) => normalizeDbMobile(r.emp_mobile) === mobile);
+    const active = matches.filter(isActiveEmployee).sort((a, b) => Number(b.emp_id) - Number(a.emp_id));
+    return { matches, active };
+  }
+
+  async function requestOtp(body: Row, signal?: AbortSignal): Promise<Result> {
+    const mobile = normalizeDbMobile(body.mobile);
+    if (!mobile) return fail(422, 'Enter a valid 10-digit Indian mobile number.', 'INVALID_MOBILE');
+    const allowance = await smsAllowance(mobile);
+    if ('blocked' in allowance) return allowance.blocked;
+
+    const { matches, active } = await employeesWithMobile(mobile, signal);
+    if (!matches.length) {
+      return fail(422, 'This number is not registered with CecureUs yet.', 'NOT_REGISTERED');
+    }
+    if (!active.length) return fail(422, INACTIVE_MESSAGE, 'ACCOUNT_INACTIVE');
+    return issueOtp(mobile, allowance.sent, { empId: str(active[0].emp_id), signup: null });
+  }
+
+  /**
+   * New sign-up, step 1: check the details and send a code to the number. Nothing is written yet —
+   * the employee_list row is created only after the person proves they hold the number.
+   */
+  async function register(body: Row, signal?: AbortSignal): Promise<Result> {
+    const mobile = normalizeDbMobile(body.mobile);
+    if (!mobile) return fail(422, 'Enter a valid 10-digit Indian mobile number.', 'INVALID_MOBILE');
+    const userType = body.userType === 'corporate' ? 'corporate' : 'individual';
+    const signup: Signup = {
+      userType,
+      firstName: cleanText(body.firstName, 50),
+      lastName: cleanText(body.lastName, 50),
+      email: cleanText(body.email, 120).toLowerCase(),
+      companyName: userType === 'corporate' ? cleanText(body.companyName, 100) : '',
+    };
+    if (!signup.firstName) return fail(422, 'First name is required.', 'VALIDATION');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(signup.email)) return fail(422, 'Enter a valid email address.', 'VALIDATION');
+    if (userType === 'corporate' && !signup.companyName) return fail(422, 'Company name is required.', 'VALIDATION');
+
+    const tooManySignups = await writeBlocked('signup');
+    if (tooManySignups) return tooManySignups;
+    const allowance = await smsAllowance(mobile);
+    if ('blocked' in allowance) return allowance.blocked;
+
+    const { matches, active } = await employeesWithMobile(mobile, signal);
+    if (active.length) {
+      return fail(409, 'This number already has a CecureUs account. Please sign in instead.', 'ALREADY_REGISTERED');
+    }
+    // A number the team switched off cannot be re-activated by signing up again.
+    if (matches.length) return fail(422, INACTIVE_MESSAGE, 'ACCOUNT_INACTIVE');
+    return issueOtp(mobile, allowance.sent, { empId: null, signup });
+  }
+
+  /** New sign-up, step 2 (the number is verified): add the person to employee_list. */
+  async function createEmployee(mobile: string, signup: Signup, signal?: AbortSignal): Promise<Row> {
+    // Read again first: a retry after a lost response, or the team, may already have added them.
+    const before = await employeesWithMobile(mobile, signal);
+    if (before.active.length) return before.active[0];
+    if (before.matches.length) throw new InactiveAccount();
+    const response = await tables.create(
+      'employee_list',
+      newEmployeeRow({ ...signup, mobileE164: mobile, timestamp: legacyTimestamp(now()) }),
+      signal,
+    );
+    await recordWrite('signup');
+    const id = insertedId(response, 'emp_id');
+    const byId = id ? await tables.get('employee_list', id, signal) : null;
+    if (byId && normalizeDbMobile(byId.emp_mobile) === mobile && isActiveEmployee(byId)) return byId;
+    const created = (await employeesWithMobile(mobile, signal)).active[0];
+    if (!created) throw new TableApiError('Employee was not found after insert');
+    return created;
+  }
+
   async function verifyOtp(body: Row, signal?: AbortSignal): Promise<Result> {
-    const entry = otps.get(str(body.requestId));
+    const requestId = str(body.requestId);
+    const l = await loadLimits();
+    if (l.wrong.length >= OTP_WRONG_MAX) {
+      return fail(429, 'Too many incorrect codes. Please try again later.', 'OTP_LOCKED', waitFor(l.wrong, OTP_WRONG_WINDOW_MS));
+    }
+    const entry = otps.get(requestId);
     if (!entry) return fail(422, 'This code is not valid. Please request a new one.', 'OTP_INVALID');
     if (now() - entry.issuedAt > OTP_TTL_MS) {
-      otps.delete(str(body.requestId));
+      otps.delete(requestId);
       return fail(422, 'This code has expired. Request a new one.', 'OTP_EXPIRED');
     }
     if (entry.attempts >= OTP_MAX_ATTEMPTS) {
@@ -221,13 +396,27 @@ export function createTableBackend(opts: TableBackendOptions) {
     }
     if (!constantTimeEqual(entry.code, str(body.otp))) {
       entry.attempts += 1;
+      l.wrong = [...l.wrong, now()];
+      await saveLimits();
       return fail(422, 'Incorrect code. Please try again.', 'OTP_INVALID');
     }
-    otps.delete(str(body.requestId));
-    const row = await employee(entry.empId, signal, true);
-    if (!row || !isActiveEmployee(row)) {
-      return fail(422, 'Your account is not active. Please contact CecureUs at connect@cecureus.com.', 'ACCOUNT_INACTIVE');
+    let row: Row | null;
+    if (entry.signup) {
+      // The code stays valid until the account exists, so a dropped connection can simply be retried.
+      try {
+        row = await createEmployee(entry.mobile, entry.signup, signal);
+      } catch (e) {
+        if (!(e instanceof InactiveAccount)) throw e;
+        otps.delete(requestId);
+        return fail(422, INACTIVE_MESSAGE, 'ACCOUNT_INACTIVE');
+      }
+      otps.delete(requestId);
+      employeeCache.set(str(row.emp_id), { at: now(), row });
+    } else {
+      otps.delete(requestId);
+      row = entry.empId ? await employee(entry.empId, signal, true) : null;
     }
+    if (!row || !isActiveEmployee(row)) return fail(422, INACTIVE_MESSAGE, 'ACCOUNT_INACTIVE');
     return ok(await openSession(row));
   }
 
@@ -297,7 +486,10 @@ export function createTableBackend(opts: TableBackendOptions) {
       return fail(409, 'This time slot is no longer available. Please choose another.', 'SLOT_UNAVAILABLE');
     }
 
-    const issue = str(body.issueId) || null;
+    const tooManyBookings = await writeBlocked('booking');
+    if (tooManyBookings) return tooManyBookings;
+    const issue = cleanText(body.issueId, 100) || null;
+    await recordWrite('booking');
     const response = await tables.create(
       'booking_appointment',
       newBookingRow({
@@ -308,8 +500,8 @@ export function createTableBackend(opts: TableBackendOptions) {
         durationMinutes: SLOT_MINUTES,
         mode,
         issue,
-        language: str(body.language) || null,
-        notes: str(body.notes).slice(0, 500) || null,
+        language: cleanText(body.language, 50) || null,
+        notes: cleanText(body.notes, 500) || null,
         timestamp: legacyTimestamp(now()),
       }),
       signal,
@@ -350,6 +542,7 @@ export function createTableBackend(opts: TableBackendOptions) {
     signal?: AbortSignal,
   ): Promise<Result> {
     if (method === 'POST' && path === 'auth/otp/request') return requestOtp(body, signal);
+    if (method === 'POST' && path === 'auth/register') return register(body, signal);
     if (method === 'POST' && path === 'auth/otp/verify') return verifyOtp(body, signal);
 
     if (method === 'GET' && path === 'issues') {
@@ -374,8 +567,8 @@ export function createTableBackend(opts: TableBackendOptions) {
     // ---- profile ----
     if (method === 'GET' && path === 'me') return ok(toUser(user));
     if (method === 'PATCH' && path === 'me') {
-      const firstName = str(body.firstName);
-      const lastName = str(body.lastName);
+      const firstName = cleanText(body.firstName, 50);
+      const lastName = cleanText(body.lastName, 50);
       const age = body.age;
       if (!firstName) return fail(422, 'First name is required.', 'VALIDATION');
       if (age !== null && age !== undefined && (!Number.isInteger(age) || (age as number) < 18 || (age as number) > 100)) {
@@ -387,6 +580,9 @@ export function createTableBackend(opts: TableBackendOptions) {
         emp_age: age === null || age === undefined ? '' : String(age),
         updated_at: legacyTimestamp(now()),
       };
+      const tooManyEdits = await writeBlocked('profile');
+      if (tooManyEdits) return tooManyEdits;
+      await recordWrite('profile');
       await tables.update('employee_list', empId, patch, signal);
       const updated = { ...user, ...patch };
       employeeCache.set(empId, { at: now(), row: updated });
@@ -394,6 +590,9 @@ export function createTableBackend(opts: TableBackendOptions) {
     }
     if (method === 'DELETE' && path === 'me') {
       // Deletion request: the account is switched off immediately; the team removes the data.
+      const tooManyDeletions = await writeBlocked('deletion');
+      if (tooManyDeletions) return tooManyDeletions;
+      await recordWrite('deletion');
       await tables.update('employee_list', empId, { status: 'Cancel', updated_at: legacyTimestamp(now()) }, signal);
       employeeCache.delete(empId);
       await dropSessionsFor(empId);
@@ -453,10 +652,13 @@ export function createTableBackend(opts: TableBackendOptions) {
       if (!row || str(row.customer_id) !== empId) return fail(404, 'Booking not found', 'NOT_FOUND');
       const booking = toBooking(row, now());
       if (!booking?.cancellable) return fail(409, 'This session can no longer be cancelled.', 'NOT_CANCELLABLE');
+      const tooManyCancels = await writeBlocked('cancel');
+      if (tooManyCancels) return tooManyCancels;
+      await recordWrite('cancel');
       const patch = {
         status: 'Cancel',
         canceledby: 'User',
-        reason: str(body.reason).slice(0, 250),
+        reason: cleanText(body.reason, 250),
         updated_at: legacyTimestamp(now()),
       };
       await tables.update('booking_appointment', str(row.book_id), patch, signal);

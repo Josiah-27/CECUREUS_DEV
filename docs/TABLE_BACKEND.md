@@ -10,15 +10,27 @@ It is turned on with `EXPO_PUBLIC_BACKEND=table`. When the CecureUs server provi
 
 | Table | Read | Write |
 |---|---|---|
-| `employee_list` | Sign-in: finds the row whose `emp_mobile` matches and whose `status` is `Active`. Profile: `/employee_list/{emp_id}` | **PUT** `emp_name`, `emp_lname`, `emp_age` when the user edits their profile. **PUT** `status = 'Cancel'` when the user deletes their account. **Never creates rows.** |
+| `employee_list` | Sign-in: finds the row whose `emp_mobile` matches and whose `status` is `Active`. Profile: `/employee_list/{emp_id}` | **POST** a new row when a person signs up in the app and has confirmed their number by SMS code. **PUT** `emp_name`, `emp_lname`, `emp_age` when the user edits their profile. **PUT** `status = 'Cancel'` when the user deletes their account. |
 | `doctor_list` | Active counsellors. Only these columns reach the screen: name, city name, experience, `doc_category`, description and photo file name. | none |
 | `booking_appointment` | The user's own bookings (`customer_id = emp_id`), plus every counsellor's bookings so taken slots can be hidden | **POST** a new booking, in the same format the website uses. **PUT** `status = 'Cancel'`, `canceledby = 'User'` and `reason` when the user cancels. |
 | `doctor_category` | not used yet | none |
 
-### New accounts go through WhatsApp
-**Get Started** collects the person's name, mobile number, email, and company and employee ID for corporate users. It then opens WhatsApp to **+91 72005 00221** with those details filled in.
+### New accounts are created by the app
+1. **Get Started** collects the person's name, mobile number, email, and company and employee ID for corporate users.
+2. The app sends a 6-digit code to that number by SMS. Nothing is written yet.
+3. When the person enters the code, the app adds them to `employee_list` and signs them in.
+4. WhatsApp then opens to **+91 72005 00221** with the same details filled in, so the team knows who joined. The person still has to tap Send there.
 
-The CecureUs team checks the details and adds the person to `employee_list` with `status = Active` and their 10-digit `emp_mobile`. From then on, they can sign in.
+The new row has `status = Active`, the 10-digit `emp_mobile`, `emp_name`, `emp_lname`, `emp_email` and `emp_option` (`Corporate` or `Individual`). For corporate users the company goes in `emp_organisationname`. `emp_familyoption` is `Self`, `position` is `0`, and `reg_date`, `created_at` and `updated_at` use the same formats as existing rows. Every other column is an empty string.
+
+Rules:
+- A number that already has an active account is told to sign in instead.
+- A number the team has set to `DeActive` or `Cancel` can't sign up again.
+- Names and company are stripped of `<`, `>` and control characters before they are stored.
+- If the connection drops while the account is being created, entering the code again finishes the job without adding a second row.
+- The employee ID has no column in `employee_list`, so it is only in the WhatsApp message.
+
+**The account is active straight away.** Nobody at CecureUs approves it first, and the app doesn't check that a corporate user really works at the company they typed. The WhatsApp message is how the team finds out; if someone shouldn't have access, set their `status` to `DeActive`.
 
 ### Sign-in uses the mobile number and an SMS code
 1. The user enters their mobile number.
@@ -74,6 +86,25 @@ These are enforced in [`table-api.ts`](../src/api/table-backend/table-api.ts), t
 - **A lookup by id only accepts that row.** If the server returns a different row, it is ignored.
 - **Updates can't change a row's primary key.**
 - **HTTPS only**, checked when the app starts.
+
+### Rate limits
+The limits are kept in the phone's keystore, so closing and reopening the app does not reset them.
+
+| What | Limit |
+|---|---|
+| SMS codes to one number | 1 per 60 seconds, 5 per hour |
+| SMS codes from one device, any numbers | 8 per hour, 20 per day |
+| Wrong codes for one request | 5, then a new code is needed |
+| Wrong codes from one device | 10 in 15 minutes, then code entry is paused |
+| Bookings | 5 per hour |
+| Cancellations | 10 per hour |
+| Profile edits | 10 per hour |
+| New accounts from one device | 3 per day |
+| Account deletion requests | 3 per day |
+
+Text a person types (names, company, booking notes, cancellation reason) has `<`, `>` and control characters removed before it is stored.
+
+These limits stop ordinary misuse from the real app. They can't stop someone who calls the table API or the SMS gateway directly; only the server can.
 
 The app also writes as little as possible: three profile columns, the account status, new bookings, and booking cancellations. It never calls DELETE.
 
