@@ -71,9 +71,11 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.flex}>
             <AppText variant="subheading">{fullName}</AppText>
-            <AppText variant="caption" color={colors.textMuted}>
-              {user.email}
-            </AppText>
+            {user.email ? (
+              <AppText variant="caption" color={colors.textMuted}>
+                {user.email}
+              </AppText>
+            ) : null}
             {user.mobile ? (
               <AppText variant="caption" color={colors.textMuted}>
                 {user.mobile}
@@ -173,7 +175,7 @@ export default function ProfileScreen() {
         <AppText variant="subheading">Account &amp; Settings</AppText>
         <Card style={styles.menu}>
           <MenuItem Icon={User} label="Personal Information" href="/edit-profile" />
-          <MenuItem Icon={Mail} label="Contact Email" value={user.email} href="/edit-profile" />
+          <MenuItem Icon={Mail} label="Contact Email" value={user.email ?? undefined} href="/edit-profile" />
           <MenuItem Icon={CalendarDays} label="My Sessions" href="/sessions" />
           <MenuItem Icon={Phone} label="Help & Support" href="/talk-to-us" />
           <MenuItem Icon={Shield} label="Privacy & Safety" href="/privacy" />

@@ -82,13 +82,13 @@ export default function EditProfileScreen() {
         label="Email"
         value={user?.email ?? ''}
         editable={false}
-        hint="Verified at sign-up. Contact support to change it."
+        hint="Contact support to change it."
       />
       <TextField
         label="Mobile number"
         value={user?.mobile ?? ''}
         editable={false}
-        hint="Verified at sign-up. Contact support to change it."
+        hint="Contact support to change it."
       />
       {serverError ? (
         <AppText color={colors.danger} accessibilityLiveRegion="assertive">

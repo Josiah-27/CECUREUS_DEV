@@ -3,36 +3,49 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ApiError, friendlyMessage } from '@/api/errors';
+import type { OtpRequest } from '@/api/schemas';
 import { useAuth } from '@/auth/auth-provider';
+import { OtpEntry } from '@/components/otp-entry';
 import { AppText, Button, Card, Screen, TextField } from '@/components/ui';
 import { SUPPORT_EMAIL } from '@/config/constants';
+import { formatIndianMobile, normalizeIndianMobile } from '@/lib/validation';
+import { useApi } from '@/providers/api-provider';
 import { colors, spacing } from '@/theme';
 
-/** "I already have an account": sign in with user ID (email, mobile or employee ID) + password. */
+/**
+ * "I already have an account": mobile number → SMS code.
+ * Only numbers the CecureUs team has added (and activated) in employee_list can sign in.
+ */
 export default function SignInScreen() {
-  const { signIn } = useAuth();
-  const [userId, setUserId] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const api = useApi();
+  const { verifyOtp } = useAuth();
+  const [mobileInput, setMobileInput] = useState('');
+  const [mobile, setMobile] = useState<string | null>(null);
+  const [otp, setOtp] = useState<OtpRequest | null>(null);
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; register: boolean } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  async function submit() {
-    if (!userId.trim() || !password) {
-      setError('Enter your user ID and password.');
+  async function sendCode() {
+    const phone = normalizeIndianMobile(mobileInput);
+    if (!phone.value) {
+      setFieldError(phone.error ?? 'Enter your mobile number.');
       return;
     }
+    setFieldError(null);
     setError(null);
     setSubmitting(true);
     try {
-      // On success the auth guard swaps to the signed-in app automatically.
-      await signIn(userId, password);
+      const request = await api.auth.requestOtp(phone.value);
+      setMobile(phone.value);
+      setOtp(request);
     } catch (e) {
-      setError(
-        e instanceof ApiError && e.code === 'LOGIN_LOCKED'
-          ? 'Too many failed attempts. Please try again in 15 minutes.'
-          : friendlyMessage(e),
-      );
+      const message =
+        e instanceof ApiError && e.kind === 'rate_limited' && e.retryAfterSeconds
+          ? `Please wait ${e.retryAfterSeconds} seconds before requesting another code.`
+          : friendlyMessage(e);
+      setError({ message, register: e instanceof ApiError && e.code === 'NOT_REGISTERED' });
+    } finally {
       setSubmitting(false);
     }
   }
@@ -44,60 +57,58 @@ export default function SignInScreen() {
         <AppText color={colors.textMuted}>Sign in to continue your wellness journey.</AppText>
       </View>
 
-      <TextField
-        testID="signin-user-id"
-        label="User ID"
-        hint="Your email, mobile number or employee ID"
-        placeholder="you@example.com or 98765 43210"
-        value={userId}
-        onChangeText={(t) => {
-          setUserId(t);
-          if (error) setError(null);
-        }}
-        autoCapitalize="none"
-        autoCorrect={false}
-        autoComplete="username"
-        textContentType="username"
-        editable={!submitting}
-      />
-      <TextField
-        testID="signin-password"
-        label="Password"
-        placeholder="Your password"
-        value={password}
-        onChangeText={(t) => {
-          setPassword(t);
-          if (error) setError(null);
-        }}
-        secureTextEntry={!showPassword}
-        autoCapitalize="none"
-        autoCorrect={false}
-        autoComplete="current-password"
-        textContentType="password"
-        returnKeyType="go"
-        onSubmitEditing={() => void submit()}
-        editable={!submitting}
-      />
-      <Button
-        compact
-        variant="ghost"
-        label={showPassword ? 'Hide password' : 'Show password'}
-        onPress={() => setShowPassword((v) => !v)}
-        style={styles.toggle}
-      />
+      {otp && mobile ? (
+        <OtpEntry
+          key={otp.requestId}
+          destination={formatIndianMobile(mobile)}
+          initial={otp}
+          // On success the auth guard swaps to the signed-in app automatically.
+          onVerify={(requestId, code) => verifyOtp(requestId, code)}
+          onResend={() => api.auth.requestOtp(mobile)}
+          onChangeDestination={() => {
+            setOtp(null);
+            setError(null);
+          }}
+          changeLabel="Use a different number"
+        />
+      ) : (
+        <>
+          <TextField
+            testID="signin-mobile"
+            label="Mobile number"
+            hint="The number registered with CecureUs. We will send you a code by SMS."
+            placeholder="98765 43210"
+            value={mobileInput}
+            onChangeText={(t) => {
+              setMobileInput(t);
+              if (fieldError) setFieldError(null);
+              if (error) setError(null);
+            }}
+            error={fieldError}
+            keyboardType="phone-pad"
+            autoComplete="tel"
+            textContentType="telephoneNumber"
+            returnKeyType="send"
+            onSubmitEditing={() => void sendCode()}
+            editable={!submitting}
+          />
 
-      {error ? (
-        <AppText testID="signin-error" color={colors.danger} accessibilityLiveRegion="assertive">
-          {error}
-        </AppText>
-      ) : null}
+          {error ? (
+            <AppText testID="signin-error" color={colors.danger} accessibilityLiveRegion="assertive">
+              {error.message}
+            </AppText>
+          ) : null}
 
-      <Button testID="signin-submit" label="Sign in" onPress={() => void submit()} loading={submitting} />
+          <Button testID="signin-submit" label="Send code" onPress={() => void sendCode()} loading={submitting} />
+        </>
+      )}
 
       <Card tone="soft">
         <AppText variant="bodyStrong">New to CecureUs?</AppText>
         <AppText variant="caption" color={colors.textMuted}>
-          Create an account as a corporate employee or an individual.
+          {error?.register
+            ? 'This number is not registered yet. Send us your details and our team will set up your account.'
+            : 'Create an account as a corporate employee or an individual.'}
         </AppText>
         <Button
           testID="go-register"
@@ -110,7 +121,7 @@ export default function SignInScreen() {
       </Card>
 
       <AppText variant="caption" color={colors.textMuted} align="center">
-        Forgot your password? Email {SUPPORT_EMAIL} and our team will help you reset it.
+        Changed your mobile number? Email {SUPPORT_EMAIL} and our team will update it.
       </AppText>
     </Screen>
   );

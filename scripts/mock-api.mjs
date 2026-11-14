@@ -5,8 +5,7 @@
  *   npm run mock-api            # http://localhost:4000/v1
  *   EXPO_PUBLIC_API_BASE_URL=http://localhost:4000/v1 npm run web
  *
- * Sign up with any email (OTP is always 123456), or sign in with the demo account
- * harsha.verma@example.com / Harsha@123.
+ * Sign in with the demo account's mobile number 98765 43210 (the code is always 123456).
  */
 import http from 'node:http';
 

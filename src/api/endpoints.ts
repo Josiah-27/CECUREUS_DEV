@@ -19,57 +19,31 @@ import {
   okSchema,
   otpRequestSchema,
   pageSchema,
-  registrationSchema,
   userSchema,
   videoSchema,
-  type RegistrationDetails,
   type SessionMode,
-  type UserType,
 } from './schemas';
 
 export function createEndpoints(client: ApiClient) {
   return {
     auth: {
-      /** Sign in with a user ID (email, mobile number or employee ID) and password. */
-      login: (userId: string, password: string) =>
-        client.request('auth/login', authSessionSchema, {
+      /** Sends a sign-in code by SMS to a registered, active mobile number (E.164). */
+      requestOtp: (mobile: string) =>
+        client.request('auth/otp/request', otpRequestSchema, {
           method: 'POST',
           auth: false,
-          body: { userId, password },
+          body: { mobile },
+          // The table backend downloads employee_list to find the number; allow for slow networks.
+          timeoutMs: 30000,
+        }),
+      /** Checks the code and opens a session. */
+      verifyOtp: (requestId: string, otp: string) =>
+        client.request('auth/otp/verify', authSessionSchema, {
+          method: 'POST',
+          auth: false,
+          body: { requestId, otp },
         }),
       logout: () => client.request('auth/logout', okSchema, { method: 'POST' }),
-      register: {
-        requestEmailOtp: (email: string, userType: UserType) =>
-          client.request('auth/register/email/request', otpRequestSchema, {
-            method: 'POST',
-            auth: false,
-            body: { email, userType },
-          }),
-        verifyEmailOtp: (requestId: string, otp: string) =>
-          client.request('auth/register/email/verify', registrationSchema, {
-            method: 'POST',
-            auth: false,
-            body: { requestId, otp },
-          }),
-        requestPhoneOtp: (registrationToken: string, mobile: string) =>
-          client.request('auth/register/phone/request', otpRequestSchema, {
-            method: 'POST',
-            auth: false,
-            body: { registrationToken, mobile },
-          }),
-        verifyPhoneOtp: (registrationToken: string, requestId: string, otp: string) =>
-          client.request('auth/register/phone/verify', okSchema, {
-            method: 'POST',
-            auth: false,
-            body: { registrationToken, requestId, otp },
-          }),
-        complete: (registrationToken: string, details: RegistrationDetails) =>
-          client.request('auth/register/complete', authSessionSchema, {
-            method: 'POST',
-            auth: false,
-            body: { registrationToken, ...details },
-          }),
-      },
     },
 
     profile: {

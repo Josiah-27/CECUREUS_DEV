@@ -3,6 +3,8 @@ import { getEnv } from '@/config/env';
 
 import { createApiClient } from './client';
 import { createEndpoints, type Endpoints } from './endpoints';
+import { createTableBackend } from './table-backend';
+import { DEFAULT_SMS_MESSAGE } from './table-backend/sms';
 
 let unauthorizedHandler: (() => void) | null = null;
 let instance: Endpoints | null = null;
@@ -50,7 +52,19 @@ export function getApi(): Endpoints {
     const env = getEnv();
     const client = createApiClient({
       baseUrl: env.apiBaseUrl,
-      fetchImpl: demoFetch(env.apiBaseUrl),
+      fetchImpl:
+        demoFetch(env.apiBaseUrl) ??
+        (env.backend === 'table' && env.tableApiUrl
+          ? createTableBackend({
+              baseUrl: env.apiBaseUrl,
+              tableApiUrl: env.tableApiUrl,
+              sms: {
+                urlTemplate: env.smsUrlTemplate,
+                messageTemplate: env.smsMessage ?? DEFAULT_SMS_MESSAGE,
+                allowConsoleFallback: env.appEnv === 'development',
+              },
+            }).fetch
+          : undefined),
       getAccessToken: () => sessionStore.getToken(),
       onUnauthorized: () => unauthorizedHandler?.(),
     });

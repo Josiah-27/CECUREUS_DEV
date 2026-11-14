@@ -105,16 +105,17 @@ describe('createApiClient', () => {
 
   it('maps HTTP status codes and carries server code and Retry-After', async () => {
     const { client, server } = setup(null);
-    await client.request('auth/register/email/request', z.unknown(), {
+    server.addEmployee({ emp_mobile: '9876543210', emp_name: 'A' });
+    await client.request('auth/otp/request', z.unknown(), {
       method: 'POST',
       auth: false,
-      body: { email: 'a@b.co', userType: 'individual' },
+      body: { mobile: '+919876543210' },
     });
     const err = await catchError(
-      client.request('auth/register/email/request', z.unknown(), {
+      client.request('auth/otp/request', z.unknown(), {
         method: 'POST',
         auth: false,
-        body: { email: 'a@b.co', userType: 'individual' },
+        body: { mobile: '+919876543210' },
       }),
     );
     expect(err.kind).toBe('rate_limited');

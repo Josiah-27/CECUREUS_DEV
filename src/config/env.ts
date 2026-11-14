@@ -14,6 +14,17 @@ export type AppEnv = {
   appEnv: 'development' | 'preview' | 'production';
   /** Development only: the app talks to a built-in fake backend instead of the network. */
   demoMode: boolean;
+  /**
+   * 'table': the app implements its API on top of the CecureUs table API (src/api/table-backend).
+   * 'api':   the app calls a server that implements docs/API_CONTRACT.md at apiBaseUrl.
+   */
+  backend: 'table' | 'api';
+  /** Table API base, e.g. https://eap.cecureus.com/api (backend = 'table'). */
+  tableApiUrl: string | null;
+  /** SMS gateway URL with {mobile}/{mobile91}/{message}/{otp}/{date} placeholders (backend = 'table'). */
+  smsUrlTemplate: string | null;
+  /** DLT-approved SMS text with an {otp} placeholder. */
+  smsMessage: string | null;
 };
 
 export class EnvError extends Error {
@@ -30,6 +41,10 @@ type RawEnv = {
   EXPO_PUBLIC_TERMS_URL?: string;
   EXPO_PUBLIC_APP_ENV?: string;
   EXPO_PUBLIC_DEMO_MODE?: string;
+  EXPO_PUBLIC_BACKEND?: string;
+  EXPO_PUBLIC_TABLE_API_URL?: string;
+  EXPO_PUBLIC_SMS_URL_TEMPLATE?: string;
+  EXPO_PUBLIC_SMS_MESSAGE?: string;
 };
 
 const LOCAL_HOSTS = ['localhost', '127.0.0.1', '10.0.2.2'];
@@ -61,13 +76,33 @@ export function parseEnv(raw: RawEnv): AppEnv {
   if (demoMode && appEnv !== 'development') {
     throw new EnvError('EXPO_PUBLIC_DEMO_MODE is only allowed when EXPO_PUBLIC_APP_ENV=development');
   }
+  const backendRaw = raw.EXPO_PUBLIC_BACKEND?.trim() || 'api';
+  if (backendRaw !== 'table' && backendRaw !== 'api') {
+    throw new EnvError('EXPO_PUBLIC_BACKEND must be table or api');
+  }
+  const backend = backendRaw;
+  const tableApiUrl =
+    backend === 'table' && !demoMode ? validateUrl('EXPO_PUBLIC_TABLE_API_URL', raw.EXPO_PUBLIC_TABLE_API_URL, appEnv) : null;
+  const smsTemplate = raw.EXPO_PUBLIC_SMS_URL_TEMPLATE?.trim() || null;
+  if (smsTemplate) {
+    // Placeholders are not valid URL characters everywhere; check the URL with them filled in.
+    validateUrl('EXPO_PUBLIC_SMS_URL_TEMPLATE', smsTemplate.replace(/\{(mobile91|mobile|message|otp|date)\}/g, '0'), appEnv);
+  }
+  const smsMessage = raw.EXPO_PUBLIC_SMS_MESSAGE?.trim() || null;
+  if (smsMessage && !smsMessage.includes('{otp}')) {
+    throw new EnvError('EXPO_PUBLIC_SMS_MESSAGE must contain {otp}');
+  }
   return {
     appEnv,
     demoMode,
-    // In demo mode no network is used, so the API URL is optional.
+    backend,
+    tableApiUrl,
+    smsUrlTemplate: smsTemplate,
+    smsMessage,
+    // Demo mode and the table backend answer requests inside the app, so the API URL is optional.
     apiBaseUrl: validateUrl(
       'EXPO_PUBLIC_API_BASE_URL',
-      raw.EXPO_PUBLIC_API_BASE_URL ?? (demoMode ? DEMO_API_BASE_URL : undefined),
+      demoMode ? (raw.EXPO_PUBLIC_API_BASE_URL ?? DEMO_API_BASE_URL) : backend === 'table' ? TABLE_BACKEND_BASE_URL : raw.EXPO_PUBLIC_API_BASE_URL,
       appEnv,
     ),
     mediaBaseUrl: validateUrl('EXPO_PUBLIC_MEDIA_BASE_URL', raw.EXPO_PUBLIC_MEDIA_BASE_URL, appEnv),
@@ -83,6 +118,9 @@ export function parseEnv(raw: RawEnv): AppEnv {
 /** Placeholder base URL used by the in-app fake backend in demo mode. */
 export const DEMO_API_BASE_URL = 'http://localhost:4000/v1';
 
+/** Internal base URL for the table backend; requests to it are answered in-app, never sent. */
+export const TABLE_BACKEND_BASE_URL = 'https://table-backend.local/v1';
+
 let cached: AppEnv | null = null;
 
 export function getEnv(): AppEnv {
@@ -94,6 +132,10 @@ export function getEnv(): AppEnv {
       EXPO_PUBLIC_TERMS_URL: process.env.EXPO_PUBLIC_TERMS_URL,
       EXPO_PUBLIC_APP_ENV: process.env.EXPO_PUBLIC_APP_ENV,
       EXPO_PUBLIC_DEMO_MODE: process.env.EXPO_PUBLIC_DEMO_MODE,
+      EXPO_PUBLIC_BACKEND: process.env.EXPO_PUBLIC_BACKEND,
+      EXPO_PUBLIC_TABLE_API_URL: process.env.EXPO_PUBLIC_TABLE_API_URL,
+      EXPO_PUBLIC_SMS_URL_TEMPLATE: process.env.EXPO_PUBLIC_SMS_URL_TEMPLATE,
+      EXPO_PUBLIC_SMS_MESSAGE: process.env.EXPO_PUBLIC_SMS_MESSAGE,
     });
   }
   return cached;

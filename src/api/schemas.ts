@@ -51,7 +51,11 @@ export const userSchema = z.object({
   id,
   firstName: z.string(),
   lastName: optionalText,
-  email: z.string().email(),
+  /** Not every employee_list row has a (valid) email; sign-in is by mobile number. */
+  email: z
+    .string()
+    .nullish()
+    .transform((v) => (v && z.string().email().safeParse(v.trim()).success ? v.trim() : null)),
   mobile: optionalText,
   userType: userTypeSchema,
   companyName: optionalText,
@@ -68,15 +72,18 @@ export const authSessionSchema = z.object({
 });
 export type AuthSession = z.infer<typeof authSessionSchema>;
 
-/** Proof that the sign-up email was verified; required for the next registration steps. */
-export const registrationSchema = z.object({ registrationToken: z.string().min(1) });
-export type Registration = z.infer<typeof registrationSchema>;
-
-export type RegistrationDetails = {
+/**
+ * Details collected by the sign-up screen. They are sent to the CecureUs team on WhatsApp;
+ * the team verifies them and adds the person to employee_list, after which they sign in by OTP.
+ */
+export type RegistrationRequest = {
+  userType: UserType;
   firstName: string;
   lastName: string | null;
-  password: string;
-  /** Corporate only: employee ID (employee_list.emp_companyid), usable as a sign-in ID. */
+  email: string;
+  /** E.164, e.g. +919876543210 — the number they will sign in with. */
+  mobile: string;
+  companyName: string | null;
   employeeId: string | null;
 };
 

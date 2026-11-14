@@ -66,11 +66,9 @@ export const REGISTERED_ORGANISATIONS: Record<string, { name: string; sessionsPe
 export const DEMO_ACCOUNT = {
   email: 'harsha.verma@example.com',
   mobile: '+919876543210',
-  password: 'Harsha@123',
+  /** The mock always sends this code. */
+  otp: '123456',
 };
-
-export const LOGIN_MAX_ATTEMPTS = 5;
-export const LOGIN_LOCK_MS = 15 * 60 * 1000;
 
 /** Legacy DB date format seen in the dump, e.g. "25-05-2021 11:54:45 AM". */
 function dbDate(ms: number): string {
@@ -78,19 +76,6 @@ function dbDate(ms: number): string {
   const p = (n: number) => String(n).padStart(2, '0');
   const h = d.getHours() % 12 || 12;
   return `${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()} ${p(h)}:${p(d.getMinutes())}:${p(d.getSeconds())} ${d.getHours() < 12 ? 'AM' : 'PM'}`;
-}
-
-/**
- * NOT SECURE — mock only, so passwords are not kept in plain text in memory/demo storage.
- * The real backend must hash with bcrypt/argon2id (the current table appears to use MD5).
- */
-export function mockPasswordHash(password: string): string {
-  let h = 0x811c9dc5;
-  for (const ch of `cecureus-mock:${password}`) {
-    h ^= ch.charCodeAt(0);
-    h = Math.imul(h, 0x01000193) >>> 0;
-  }
-  return `mock$${h.toString(16)}`;
 }
 
 function normalizeMobile(value: unknown): string | null {
@@ -185,9 +170,6 @@ export function createMockServer(opts: MockServerOptions = {}) {
     employee_list: [] as EmployeeRow[],
     /** Server-side OTP bookkeeping (issue time / attempts); the code itself lives in employee_list.emp_otp. */
     otps: new Map<string, OtpMeta>(),
-    /** Registration tokens → the pending employee_list row and which channels are verified. */
-    registrations: new Map<string, { empId: number; emailVerified: boolean; phoneVerified: boolean }>(),
-    loginFailures: new Map<string, { count: number; lockedUntil: number }>(),
     sessions: new Map<string, { empId: number; expiresAt: number }>(),
     bookings: [] as MockBooking[],
     idempotency: new Map<string, MockBooking>(),
@@ -213,7 +195,8 @@ export function createMockServer(opts: MockServerOptions = {}) {
   });
 
   const nextEmpId = () => state.employee_list.reduce((max, r) => Math.max(max, r.emp_id), 100) + 1;
-  const activeRows = () => state.employee_list.filter((r) => r.status === 'active');
+  const isActive = (r: EmployeeRow) => r.status.toLowerCase() === 'active';
+  const activeRows = () => state.employee_list.filter(isActive);
   const touch = (row: EmployeeRow) => {
     row.updated_at = dbDate(now());
   };
@@ -227,9 +210,9 @@ export function createMockServer(opts: MockServerOptions = {}) {
       lastName: row.emp_lname || null,
       email: row.emp_email,
       mobile: row.emp_mobile || null,
-      userType: row.emp_role === 'corporate' ? 'corporate' : 'individual',
+      userType: row.emp_option.toLowerCase() === 'corporate' ? 'corporate' : 'individual',
       companyName: row.emp_companyname || null,
-      sessionsRemaining: row.emp_role === 'corporate' && org ? org.sessionsPerYear : null,
+      sessionsRemaining: row.emp_option.toLowerCase() === 'corporate' && org ? org.sessionsPerYear : null,
       age: row.emp_age ? Number(row.emp_age) : null,
     };
   }
@@ -274,31 +257,23 @@ export function createMockServer(opts: MockServerOptions = {}) {
     return { row };
   }
 
-  function findLoginRow(userId: string) {
-    const id = userId.trim();
-    if (!id) return undefined;
-    const email = id.toLowerCase();
-    const mobile = normalizeMobile(id);
-    return activeRows().find(
-      (r) => r.emp_email === email || (mobile && r.emp_mobile === mobile) || (r.emp_companyid && r.emp_companyid === id),
-    );
+  /** Inserts an employee_list row, as the CecureUs team does after a WhatsApp sign-up request. */
+  function addEmployee(fields: Partial<EmployeeRow> = {}): EmployeeRow {
+    const row = blankRow(nextEmpId(), now());
+    Object.assign(row, { emp_country: 'India', reg_date: dbDate(now()), status: 'Active' }, fields);
+    state.employee_list.push(row);
+    return row;
   }
 
   if (opts.seedDemoAccount) {
-    const row = blankRow(nextEmpId(), now());
-    Object.assign(row, {
+    addEmployee({
       emp_name: 'Harsha',
       emp_lname: 'Verma',
       emp_email: DEMO_ACCOUNT.email,
-      emp_mobile: DEMO_ACCOUNT.mobile,
-      emp_password: mockPasswordHash(DEMO_ACCOUNT.password),
+      emp_mobile: DEMO_ACCOUNT.mobile.replace(/^\+91/, ''),
       emp_age: '29',
-      emp_role: 'individual',
-      emp_country: 'India',
-      reg_date: dbDate(now()),
-      status: 'active',
+      emp_option: 'Individual',
     });
-    state.employee_list.push(row);
   }
 
   function authUser(headers: Record<string, string>) {
@@ -309,120 +284,25 @@ export function createMockServer(opts: MockServerOptions = {}) {
   }
 
   function route(method: string, path: string, query: URLSearchParams, headers: Record<string, string>, body: any) {
-    // ---- Registration: email OTP → mobile OTP → name + password ----
-    if (method === 'POST' && path === 'auth/register/email/request') {
-      const email = String(body?.email ?? '').trim().toLowerCase();
-      const userType = body?.userType === 'corporate' ? 'corporate' : 'individual';
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail(422, 'Enter a valid email address.', 'INVALID_EMAIL');
-      if (activeRows().some((r) => r.emp_email === email)) {
-        return fail(409, 'An account with this email already exists. Please sign in instead.', 'EMAIL_TAKEN');
-      }
-      const org = REGISTERED_ORGANISATIONS[email.split('@')[1]];
-      if (userType === 'corporate' && !org) {
-        return fail(
-          422,
-          'Your organisation is not registered with CecureUs yet. Check your work email or continue as an individual.',
-          'COMPANY_NOT_REGISTERED',
-        );
-      }
-      let row = state.employee_list.find((r) => r.status === 'pending' && r.emp_email === email);
+    // ---- Sign in: mobile number → SMS code (accounts are created by the CecureUs team) ----
+    if (method === 'POST' && path === 'auth/otp/request') {
+      const mobile = normalizeMobile(body?.mobile);
+      if (!mobile) return fail(422, 'Enter a valid 10-digit Indian mobile number.', 'INVALID_MOBILE');
+      const matches = state.employee_list.filter((r) => normalizeMobile(r.emp_mobile) === mobile);
+      if (!matches.length) return fail(422, 'This number is not registered with CecureUs yet.', 'NOT_REGISTERED');
+      const row = matches.filter(isActive).sort((a, b) => b.emp_id - a.emp_id)[0];
       if (!row) {
-        row = blankRow(nextEmpId(), now());
-        state.employee_list.push(row);
+        return fail(422, 'Your account is not active. Please contact CecureUs at connect@cecureus.com.', 'ACCOUNT_INACTIVE');
       }
-      Object.assign(row, {
-        emp_email: email,
-        emp_role: userType,
-        emp_companyname: userType === 'corporate' ? org!.name : '',
-        emp_organisationname: userType === 'corporate' ? org!.name : '',
-      });
-      return issueOtp(row, 'email', email);
+      return issueOtp(row, 'phone', mobile);
     }
-    if (method === 'POST' && path === 'auth/register/email/verify') {
-      const result = checkOtp(body?.requestId, body?.otp, 'email');
+    if (method === 'POST' && path === 'auth/otp/verify') {
+      const result = checkOtp(body?.requestId, body?.otp, 'phone');
       if (result.error) return result.error;
-      const registrationToken = `reg-${++state.seq}`;
-      state.registrations.set(registrationToken, { empId: result.row.emp_id, emailVerified: true, phoneVerified: false });
-      return ok({ registrationToken });
-    }
-    if (
-      method === 'POST' &&
-      (path === 'auth/register/phone/request' || path === 'auth/register/phone/verify' || path === 'auth/register/complete')
-    ) {
-      const reg = state.registrations.get(String(body?.registrationToken));
-      const row = reg && state.employee_list.find((r) => r.emp_id === reg.empId && r.status === 'pending');
-      if (!reg || !row) return fail(422, 'Your sign-up session has expired. Please start again.', 'REGISTRATION_EXPIRED');
-
-      if (path === 'auth/register/phone/request') {
-        const mobile = normalizeMobile(body?.mobile);
-        if (!mobile) return fail(422, 'Enter a valid 10-digit Indian mobile number.', 'INVALID_MOBILE');
-        if (activeRows().some((r) => r.emp_mobile === mobile)) {
-          return fail(409, 'This mobile number is already linked to an account. Please sign in instead.', 'MOBILE_TAKEN');
-        }
-        row.emp_mobile = mobile;
-        reg.phoneVerified = false;
-        return issueOtp(row, 'phone', mobile);
+      if (!isActive(result.row)) {
+        return fail(422, 'Your account is not active. Please contact CecureUs at connect@cecureus.com.', 'ACCOUNT_INACTIVE');
       }
-      if (path === 'auth/register/phone/verify') {
-        const meta = state.otps.get(String(body?.requestId));
-        if (meta && meta.empId !== row.emp_id) return fail(422, 'This code is not valid.', 'OTP_INVALID');
-        const result = checkOtp(body?.requestId, body?.otp, 'phone');
-        if (result.error) return result.error;
-        reg.phoneVerified = true;
-        return ok(null);
-      }
-      // auth/register/complete
-      if (!reg.emailVerified || !reg.phoneVerified) {
-        return fail(422, 'Please verify your email and mobile number first.', 'VERIFICATION_REQUIRED');
-      }
-      const firstName = String(body?.firstName ?? '').trim();
-      const lastName = String(body?.lastName ?? '').trim();
-      const password = String(body?.password ?? '');
-      const employeeId = String(body?.employeeId ?? '').trim();
-      if (!firstName) return fail(422, 'First name is required.', 'VALIDATION');
-      if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
-        return fail(422, 'Password must be at least 8 characters with a letter and a number.', 'WEAK_PASSWORD');
-      }
-      if (
-        employeeId &&
-        activeRows().some((r) => r.emp_companyid === employeeId && r.emp_companyname === row.emp_companyname)
-      ) {
-        return fail(409, 'This employee ID is already registered.', 'EMPLOYEE_ID_TAKEN');
-      }
-      Object.assign(row, {
-        emp_name: firstName,
-        emp_lname: lastName,
-        emp_password: mockPasswordHash(password),
-        emp_companyid: row.emp_role === 'corporate' ? employeeId : '',
-        emp_agree: 'yes',
-        reg_date: dbDate(now()),
-        status: 'active',
-      });
-      touch(row);
-      state.registrations.delete(String(body?.registrationToken));
-      return ok(openSession(row), 201);
-    }
-
-    // ---- Sign in: user ID = email, mobile number or employee ID ----
-    if (method === 'POST' && path === 'auth/login') {
-      const userId = String(body?.userId ?? '').trim();
-      const key = userId.toLowerCase();
-      const failures = state.loginFailures.get(key);
-      if (failures && failures.lockedUntil > now()) {
-        return {
-          ...fail(429, 'Too many failed attempts. Please try again in 15 minutes.', 'LOGIN_LOCKED'),
-          retryAfter: Math.ceil((failures.lockedUntil - now()) / 1000),
-        };
-      }
-      const row = findLoginRow(userId);
-      if (!row || row.emp_password !== mockPasswordHash(String(body?.password ?? ''))) {
-        const count = (failures?.count ?? 0) + 1;
-        state.loginFailures.set(key, { count, lockedUntil: count >= LOGIN_MAX_ATTEMPTS ? now() + LOGIN_LOCK_MS : 0 });
-        // Same message whether the user ID or the password is wrong (no account enumeration).
-        return fail(422, 'Incorrect user ID or password.', 'INVALID_CREDENTIALS');
-      }
-      state.loginFailures.delete(key);
-      return ok(openSession(row));
+      return ok(openSession(result.row));
     }
 
     // Public reference data
@@ -453,7 +333,7 @@ export function createMockServer(opts: MockServerOptions = {}) {
     }
     if (method === 'DELETE' && path === 'me') {
       state.deletionRequests.push(user.emp_email);
-      user.status = 'deleted';
+      user.status = 'Cancel';
       for (const [token, sess] of state.sessions) if (sess.empId === user.emp_id) state.sessions.delete(token);
       return ok(null);
     }
@@ -609,7 +489,7 @@ export function createMockServer(opts: MockServerOptions = {}) {
     state.seq = snap.seq;
   }
 
-  return { fetch: fetchImpl, state, snapshot, restore };
+  return { fetch: fetchImpl, state, snapshot, restore, addEmployee };
 }
 
 export type MockServer = ReturnType<typeof createMockServer>;

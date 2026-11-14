@@ -1,5 +1,11 @@
 # Backend Blockers & Open Questions
 
+> **Update 2026-11-01:** The app now runs on the CecureUs table API (`/api/{table}`), using
+> `employee_list`, `doctor_list` and `booking_appointment`. Sign-up requests go to the team on WhatsApp.
+> Sign-in is by mobile number and SMS OTP, with SMS Integra as a placeholder until the key arrives.
+> Details, limits and the remaining asks are in [docs/TABLE_BACKEND.md](docs/TABLE_BACKEND.md).
+> The email/password sign-up described below (B-02, B-17) has been replaced.
+
 Last updated: 2026-10-20. The app is implemented and tested against the **proposed** contract in
 `docs/API_CONTRACT.md` using a deterministic mock server. **No feature below has been tested against a
 real CecureUs backend.** Mock-tested ≠ production-ready.

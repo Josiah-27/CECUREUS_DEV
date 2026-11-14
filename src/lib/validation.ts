@@ -28,6 +28,12 @@ export function normalizeIndianMobile(value: string): { value: string | null; er
   return { value: `+91${m[1]}`, error: null };
 }
 
+/** "+919876543210" → "+91 98765 43210" (display only). */
+export function formatIndianMobile(e164: string): string {
+  const d = e164.replace(/^\+91/, '');
+  return `+91 ${d.slice(0, 5)} ${d.slice(5)}`;
+}
+
 export function validateName(value: string, label = 'Name'): string | null {
   const v = value.trim();
   if (!v) return `${label} is required.`;

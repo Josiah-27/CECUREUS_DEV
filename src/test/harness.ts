@@ -23,26 +23,32 @@ export function resetDeviceStorage() {
 export type TestAccount = {
   userType?: UserType;
   email?: string;
+  /** 10-digit number as stored in employee_list.emp_mobile. */
   mobile?: string;
   firstName?: string;
-  lastName?: string | null;
-  password?: string;
-  employeeId?: string | null;
+  lastName?: string;
+  status?: string;
 };
 
-export const TEST_PASSWORD = 'Secret123';
-
-/** Registers through the real sign-up endpoints (email OTP → mobile OTP → details); returns the session. */
+/** Adds the person to employee_list (as the CecureUs team does), then signs in via SMS OTP. */
 export async function registerDirect(server: ReturnType<typeof createMockServer>, account: TestAccount = {}) {
   const {
     userType = 'corporate',
     email = 'harsha@fixturecorp.com',
-    mobile = '+919876543210',
+    mobile = '9876543210',
     firstName = 'Harsha',
     lastName = 'Verma',
-    password = TEST_PASSWORD,
-    employeeId = null,
+    status = 'Active',
   } = account;
+  server.addEmployee({
+    emp_name: firstName,
+    emp_lname: lastName,
+    emp_email: email,
+    emp_mobile: mobile,
+    emp_option: userType === 'corporate' ? 'Corporate' : 'Individual',
+    emp_companyname: userType === 'corporate' ? 'Fixture Corp' : '',
+    status,
+  });
   const api = createEndpoints(
     createApiClient({
       baseUrl: process.env.EXPO_PUBLIC_API_BASE_URL!,
@@ -50,14 +56,11 @@ export async function registerDirect(server: ReturnType<typeof createMockServer>
       fetchImpl: server.fetch,
     }),
   );
-  const emailOtp = await api.auth.register.requestEmailOtp(email, userType);
-  const { registrationToken } = await api.auth.register.verifyEmailOtp(emailOtp.requestId, '123456');
-  const phoneOtp = await api.auth.register.requestPhoneOtp(registrationToken, mobile);
-  await api.auth.register.verifyPhoneOtp(registrationToken, phoneOtp.requestId, '123456');
-  return api.auth.register.complete(registrationToken, { firstName, lastName, password, employeeId });
+  const otp = await api.auth.requestOtp(`+91${mobile}`);
+  return api.auth.verifyOtp(otp.requestId, '123456');
 }
 
-/** Creates an account on the mock server and stores the session like a completed sign-up would. */
+/** Creates an account on the mock server and stores the session like a completed sign-in would. */
 export async function signInDirect(
   server: ReturnType<typeof createMockServer>,
   userType: UserType = 'corporate',
@@ -66,10 +69,10 @@ export async function signInDirect(
   const session = await registerDirect(server, {
     userType,
     email,
-    mobile: userType === 'corporate' ? '+919876543210' : '+919812345678',
+    mobile: userType === 'corporate' ? '9876543210' : '9812345678',
   });
   await sessionStore.save(session);
-  // Start each test with clean logs: sign-up itself sends a verification email and SMS.
+  // Start each test with clean logs: sign-in itself sends an SMS.
   server.state.calls.length = 0;
   server.state.otps.clear();
   server.state.smsLog.length = 0;

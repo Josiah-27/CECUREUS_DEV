@@ -43,10 +43,11 @@ describe('counsellorSchema', () => {
 });
 
 describe('userSchema', () => {
-  it('requires a valid email and known user type', () => {
+  it('drops a missing or invalid email (not every employee_list row has one) and requires a known user type', () => {
     const base = { id: 1, firstName: 'A', email: 'a@b.co', userType: 'corporate' };
-    expect(userSchema.safeParse(base).success).toBe(true);
-    expect(userSchema.safeParse({ ...base, email: 'nope' }).success).toBe(false);
+    expect(userSchema.parse(base).email).toBe('a@b.co');
+    expect(userSchema.parse({ ...base, email: 'nope' }).email).toBeNull();
+    expect(userSchema.parse({ ...base, email: '' }).email).toBeNull();
     expect(userSchema.safeParse({ ...base, userType: 'guest' }).success).toBe(false);
   });
 });

@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { setUnauthorizedHandler } from '@/api';
-import type { AuthSession, RegistrationDetails, User } from '@/api/schemas';
+import type { AuthSession, User } from '@/api/schemas';
 import { useApi } from '@/providers/api-provider';
 
 import { sessionStore } from './session-store';
@@ -13,10 +13,8 @@ type AuthContextValue = {
   user: User | null;
   /** Set when the user was signed out because the server rejected the session. */
   sessionExpired: boolean;
-  /** Sign in with a user ID (email, mobile or employee ID) and password. */
-  signIn: (userId: string, password: string) => Promise<void>;
-  /** Final sign-up step (after email + mobile OTP verification); signs the new user in. */
-  completeRegistration: (registrationToken: string, details: RegistrationDetails) => Promise<void>;
+  /** Verifies the SMS code sent to the user's mobile and signs them in. */
+  verifyOtp: (requestId: string, code: string) => Promise<void>;
   updateUser: (user: User) => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -61,14 +59,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('signedIn');
   }, []);
 
-  const signIn = useCallback(
-    async (userId: string, password: string) => startSession(await api.auth.login(userId.trim(), password)),
-    [api, startSession],
-  );
-
-  const completeRegistration = useCallback(
-    async (registrationToken: string, details: RegistrationDetails) =>
-      startSession(await api.auth.register.complete(registrationToken, details)),
+  const verifyOtp = useCallback(
+    async (requestId: string, code: string) => startSession(await api.auth.verifyOtp(requestId, code)),
     [api, startSession],
   );
 
@@ -88,8 +80,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [api, clearLocal]);
 
   const value = useMemo(
-    () => ({ status, user, sessionExpired, signIn, completeRegistration, updateUser, signOut }),
-    [status, user, sessionExpired, signIn, completeRegistration, updateUser, signOut],
+    () => ({ status, user, sessionExpired, verifyOtp, updateUser, signOut }),
+    [status, user, sessionExpired, verifyOtp, updateUser, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
