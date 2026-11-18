@@ -8,6 +8,7 @@
  * Starts with no accounts: sign up with Get Started (the mock's code is always 123456), then sign in
  * with the mobile number you registered.
  */
+import { Buffer } from 'node:buffer';
 import http from 'node:http';
 
 const PORT = Number(process.env.MOCK_API_PORT ?? 4000);

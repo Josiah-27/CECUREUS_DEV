@@ -64,6 +64,15 @@ describe('Ally (Phase 2 placeholder)', () => {
 });
 
 describe('reading history and bookmarks (device only)', () => {
+  // Keep this first in the block: after the two /articles tests below, expo-router's test renderer keeps
+  // the previous /articles state and ignores initialUrl '/profile' (a test-harness quirk, not an app bug).
+  it('counts completed blogs on the profile overview', async () => {
+    await readArticleStore.add({ id: '1', title: '5 Signs You Might Be Overwhelmed', category: 'Stress', readMinutes: 5, imageUrl: null });
+    await renderRouter(APP_DIR, { initialUrl: '/profile' });
+    expect(await screen.findByLabelText('Blogs Completed: 1. View All')).toBeOnTheScreen();
+    expect(screen.getByText('5 Signs You Might Be Overwhelmed')).toBeOnTheScreen();
+  });
+
   it('marks an article as read and shows it under Blogs Completed on Profile', async () => {
     await renderRouter(APP_DIR, { initialUrl: '/articles/1' });
     const target = await screen.findByTestId('mark-read');
@@ -81,12 +90,5 @@ describe('reading history and bookmarks (device only)', () => {
     await fireEvent.press(screen.getByTestId('category-Saved'));
     expect(await screen.findByTestId('article-2')).toBeOnTheScreen();
     await waitFor(() => expect(screen.queryByTestId('article-1')).toBeNull());
-  });
-
-  it('counts completed blogs on the profile overview', async () => {
-    await readArticleStore.add({ id: '1', title: '5 Signs You Might Be Overwhelmed', category: 'Stress', readMinutes: 5, imageUrl: null });
-    await renderRouter(APP_DIR, { initialUrl: '/profile' });
-    expect(await screen.findByLabelText('Blogs Completed: 1. View All')).toBeOnTheScreen();
-    expect(screen.getByText('5 Signs You Might Be Overwhelmed')).toBeOnTheScreen();
   });
 });
