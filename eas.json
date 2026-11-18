@@ -17,10 +17,38 @@
       "android": {
         "buildType": "app-bundle"
       }
+    },
+    "beta": {
+      "extends": "production",
+      "environment": "preview",
+      "env": {
+        "APP_VARIANT": "beta",
+        "EXPO_PUBLIC_BETA_GATE": "true",
+        "EXPO_PUBLIC_APP_ENV": "production",
+        "EXPO_PUBLIC_DEMO_MODE": "false",
+        "EXPO_PUBLIC_BACKEND": "table",
+        "EXPO_PUBLIC_TABLE_API_URL": "https://eap.cecureus.com/api",
+        "EXPO_PUBLIC_MEDIA_BASE_URL": "https://eap.cecureus.com/uploads",
+        "EXPO_PUBLIC_PRIVACY_POLICY_URL": "https://cecureus.com/privacy-policy",
+        "EXPO_PUBLIC_TERMS_URL": "https://cecureus.com/terms"
+      }
+    },
+    "beta-apk": {
+      "extends": "beta",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
     }
   },
   "submit": {
     "production": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft"
+      }
+    },
+    "beta": {
       "android": {
         "track": "internal",
         "releaseStatus": "draft"

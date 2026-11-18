@@ -14,6 +14,7 @@ import { AuthProvider, useAuth } from '@/auth/auth-provider';
 import { DemoBadge } from '@/components/demo-badge';
 import { AppText } from '@/components/ui';
 import { getEnv } from '@/config/env';
+import { BetaCodeScreen, useBetaGate } from '@/features/beta/beta-gate';
 import { installWebAlertShim } from '@/lib/web-alert-shim';
 import { ApiProvider } from '@/providers/api-provider';
 import { colors, spacing } from '@/theme';
@@ -23,15 +24,19 @@ installWebAlertShim();
 
 function RootNavigator() {
   const { status } = useAuth();
+  const beta = useBetaGate();
   const [fontsLoaded, fontError] = useFonts({ Nunito_400Regular, Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold });
   // If fonts fail to load we continue with the system font rather than blocking the app.
-  const ready = status !== 'loading' && (fontsLoaded || !!fontError);
+  const ready = status !== 'loading' && beta.state !== 'checking' && (fontsLoaded || !!fontError);
 
   useEffect(() => {
     if (ready) void SplashScreen.hideAsync();
   }, [ready]);
 
   if (!ready) return null;
+
+  // c_beta test build only: ask for the beta code before anything else opens.
+  if (beta.state === 'locked') return <BetaCodeScreen onSubmit={beta.unlock} />;
 
   return (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.screen } }}>
