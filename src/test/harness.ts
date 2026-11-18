@@ -34,10 +34,10 @@ export type TestAccount = {
 export async function registerDirect(server: ReturnType<typeof createMockServer>, account: TestAccount = {}) {
   const {
     userType = 'corporate',
-    email = 'harsha@fixturecorp.com',
+    email = 'employee.one@fixturecorp.com',
     mobile = '9876543210',
-    firstName = 'Harsha',
-    lastName = 'Verma',
+    firstName = 'Test',
+    lastName = 'User',
     status = 'Active',
   } = account;
   server.addEmployee({
@@ -64,7 +64,7 @@ export async function registerDirect(server: ReturnType<typeof createMockServer>
 export async function signInDirect(
   server: ReturnType<typeof createMockServer>,
   userType: UserType = 'corporate',
-  email = userType === 'corporate' ? 'harsha@fixturecorp.com' : 'solo@example.com',
+  email = userType === 'corporate' ? 'employee.one@fixturecorp.com' : 'solo@example.com',
 ) {
   const session = await registerDirect(server, {
     userType,

@@ -24,9 +24,9 @@ const callsTo = (path: string) => server.state.calls.filter((c) => c.path === pa
 /** The CecureUs team has added this person to employee_list. */
 function addPerson(fields: Parameters<MockServer['addEmployee']>[0] = {}) {
   return server.addEmployee({
-    emp_name: 'Harsha',
-    emp_lname: 'Verma',
-    emp_email: 'harsha@fixturecorp.com',
+    emp_name: 'Test',
+    emp_lname: 'User',
+    emp_email: 'employee.one@fixturecorp.com',
     emp_mobile: '9876543210',
     emp_option: 'Corporate',
     emp_companyname: 'Fixture Corp',
@@ -89,7 +89,7 @@ describe('sign up: details → SMS code → account created, team told on WhatsA
     expect(screen.getByTestId('register-step')).toHaveTextContent(/Step 1 of 2/);
     expect(screen.queryByTestId('register-company')).toBeNull();
 
-    await fillDetails({ first: 'Priya', last: 'Nair', mobile: '98123 45678', email: 'Priya@Example.com' });
+    await fillDetails({ first: 'New', last: 'Person', mobile: '98123 45678', email: 'New.Person@Example.com' });
     await fireEvent.press(screen.getByTestId('register-send'));
 
     const input = await screen.findByTestId('otp-input');
@@ -100,28 +100,28 @@ describe('sign up: details → SMS code → account created, team told on WhatsA
     expect(open).not.toHaveBeenCalled();
 
     await fireEvent.changeText(input, '123456');
-    expect(await screen.findByText('Hi, Priya 👋')).toBeOnTheScreen();
+    expect(await screen.findByText('Hi, New 👋')).toBeOnTheScreen();
 
     expect(server.state.employee_list).toEqual([
       expect.objectContaining({
-        emp_name: 'Priya',
-        emp_lname: 'Nair',
+        emp_name: 'New',
+        emp_lname: 'Person',
         emp_mobile: '9812345678',
-        emp_email: 'priya@example.com',
+        emp_email: 'new.person@example.com',
         emp_option: 'Individual',
         status: 'Active',
       }),
     ]);
-    expect((await sessionStore.load())?.user.firstName).toBe('Priya');
+    expect((await sessionStore.load())?.user.firstName).toBe('New');
 
     await waitFor(() => expect(open).toHaveBeenCalledTimes(1));
     const url = open.mock.calls[0][0];
     expect(url).toMatch(/^https:\/\/wa\.me\/917200500221\?text=/);
     const text = decodeURIComponent(url.split('?text=')[1]);
     expect(text).toContain('Account type: Individual');
-    expect(text).toContain('Name: Priya Nair');
+    expect(text).toContain('Name: New Person');
     expect(text).toContain('Mobile: +91 98123 45678');
-    expect(text).toContain('Email: priya@example.com');
+    expect(text).toContain('Email: new.person@example.com');
     expect(text).not.toContain('Company');
   });
 
@@ -158,7 +158,7 @@ describe('sign up: details → SMS code → account created, team told on WhatsA
   it('does not create an account when the code is wrong', async () => {
     const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
     await startRegistration('individual');
-    await fillDetails({ first: 'Priya', mobile: '9812345678', email: 'priya@example.com' });
+    await fillDetails({ first: 'New', mobile: '9812345678', email: 'new.person@example.com' });
     await fireEvent.press(screen.getByTestId('register-send'));
     await fireEvent.changeText(await screen.findByTestId('otp-input'), '000000');
     expect(await screen.findByTestId('otp-error')).toHaveTextContent('Incorrect code. Please try again.');
@@ -171,17 +171,17 @@ describe('sign up: details → SMS code → account created, team told on WhatsA
     jest.spyOn(Linking, 'openURL').mockRejectedValue(new Error('no handler'));
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     await startRegistration('individual');
-    await fillDetails({ first: 'Priya', mobile: '9812345678', email: 'priya@example.com' });
+    await fillDetails({ first: 'New', mobile: '9812345678', email: 'new.person@example.com' });
     await fireEvent.press(screen.getByTestId('register-send'));
     await fireEvent.changeText(await screen.findByTestId('otp-input'), '123456');
-    expect(await screen.findByText('Hi, Priya 👋')).toBeOnTheScreen();
+    expect(await screen.findByText('Hi, New 👋')).toBeOnTheScreen();
     await waitFor(() => expect(alert).toHaveBeenCalledWith('Unable to open WhatsApp', expect.stringMatching(/72005 00221/)));
   });
 
   it('sends a number that already has an account to sign in instead', async () => {
     addPerson();
     await startRegistration('individual');
-    await fillDetails({ first: 'Harsha', mobile: '9876543210', email: 'harsha@example.com' });
+    await fillDetails({ first: 'Test', mobile: '9876543210', email: 'test.user@example.com' });
     await fireEvent.press(screen.getByTestId('register-send'));
     expect(await screen.findByTestId('register-error')).toHaveTextContent(/already has a CecureUs account/);
     expect(server.state.smsLog).toHaveLength(0);
@@ -193,7 +193,7 @@ describe('sign up: details → SMS code → account created, team told on WhatsA
   it('does not let a deactivated number sign up again', async () => {
     addPerson({ status: 'DeActive' });
     await startRegistration('individual');
-    await fillDetails({ first: 'Harsha', mobile: '9876543210', email: 'harsha@example.com' });
+    await fillDetails({ first: 'Test', mobile: '9876543210', email: 'test.user@example.com' });
     await fireEvent.press(screen.getByTestId('register-send'));
     expect(await screen.findByTestId('register-error')).toHaveTextContent(/Your account is not active/);
     expect(server.state.smsLog).toHaveLength(0);
@@ -205,7 +205,7 @@ describe('sign in with mobile number + SMS code', () => {
     addPerson();
     await openSignIn();
     await fireEvent.changeText(await requestCode('98765 43210'), '123456');
-    expect(await screen.findByText('Hi, Harsha 👋')).toBeOnTheScreen();
+    expect(await screen.findByText('Hi, Test 👋')).toBeOnTheScreen();
     expect(server.state.smsLog).toEqual([expect.objectContaining({ to: '+919876543210' })]);
     expect((await sessionStore.load())?.user.userType).toBe('corporate');
   });
@@ -214,7 +214,7 @@ describe('sign in with mobile number + SMS code', () => {
     addPerson({ emp_mobile: '91-9876543210' });
     await openSignIn();
     await fireEvent.changeText(await requestCode('+91 98765 43210'), '123456');
-    expect(await screen.findByText('Hi, Harsha 👋')).toBeOnTheScreen();
+    expect(await screen.findByText('Hi, Test 👋')).toBeOnTheScreen();
   });
 
   it('validates the number before calling the server', async () => {
@@ -323,7 +323,7 @@ describe('session lifecycle', () => {
   it('restores a persisted session on launch', async () => {
     await signInDirect(server);
     await renderRouter(APP_DIR, { initialUrl: '/' });
-    expect(await screen.findByText('Hi, Harsha 👋')).toBeOnTheScreen();
+    expect(await screen.findByText('Hi, Test 👋')).toBeOnTheScreen();
   });
 
   it('discards an expired stored session', async () => {

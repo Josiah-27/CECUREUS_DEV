@@ -5,7 +5,8 @@
  *   npm run mock-api            # http://localhost:4000/v1
  *   EXPO_PUBLIC_API_BASE_URL=http://localhost:4000/v1 npm run web
  *
- * Sign in with the demo account's mobile number 98765 43210 (the code is always 123456).
+ * Starts with no accounts: sign up with Get Started (the mock's code is always 123456), then sign in
+ * with the mobile number you registered.
  */
 import http from 'node:http';
 
@@ -13,7 +14,7 @@ const PORT = Number(process.env.MOCK_API_PORT ?? 4000);
 process.env.EXPO_PUBLIC_API_BASE_URL = `http://localhost:${PORT}/v1`;
 
 const { createMockServer } = await import('../src/test/mock-server.ts');
-const mock = createMockServer({ seedDemoAccount: true });
+const mock = createMockServer();
 
 const HEADER_CASE = { authorization: 'Authorization', 'idempotency-key': 'Idempotency-Key', 'content-type': 'Content-Type' };
 const CORS = {

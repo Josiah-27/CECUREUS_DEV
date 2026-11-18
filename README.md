@@ -37,8 +37,8 @@ Set `EXPO_PUBLIC_DEMO_MODE=true` in `.env.local`, run `npx expo start -c`, and s
 
 - **Get Started** → corporate or individual → email (code `123456`) → mobile (code `123456`) → name → password.
   Corporate sign-up needs a work email at a registered demo organisation: `@fixturecorp.com` or `@democorp.com`.
-- **I already have an account** → user ID (email, mobile or employee ID) + password.
-  Demo account: `harsha.verma@example.com` (or `98765 43210`) / `Harsha@123`.
+- **I already have an account** → the mobile number you signed up with + the SMS code.
+  There are no pre-made accounts: create one first with Get Started.
 
 A small "DEMO · sample data" badge is shown. Demo mode is refused outside development builds.
 
@@ -84,3 +84,6 @@ docs/                  API contract, security review, test plan, Play Store prep
 
 ## Releasing
 See [docs/PLAY_STORE.md](docs/PLAY_STORE.md). Builds use EAS (`eas.json`: `preview` → APK, `production` → AAB).
+
+**Google Play test app "c_beta":** step-by-step in [docs/C_BETA.md](docs/C_BETA.md) — separate package
+`com.cecureus.app.beta`, profiles `beta` (AAB) / `beta-apk` (APK), opens with the beta code screen.

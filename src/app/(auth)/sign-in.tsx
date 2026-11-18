@@ -77,7 +77,7 @@ export default function SignInScreen() {
             testID="signin-mobile"
             label="Mobile number"
             hint="The number registered with CecureUs. We will send you a code by SMS."
-            placeholder="98765 43210"
+            placeholder="10-digit mobile number"
             value={mobileInput}
             onChangeText={(t) => {
               setMobileInput(t);

@@ -141,7 +141,7 @@ export default function RegisterScreen() {
             testID="register-mobile"
             label="Mobile number"
             hint="You will sign in with this number"
-            placeholder="98765 43210"
+            placeholder="10-digit mobile number"
             value={mobileInput}
             onChangeText={setMobileInput}
             error={errors.mobile}

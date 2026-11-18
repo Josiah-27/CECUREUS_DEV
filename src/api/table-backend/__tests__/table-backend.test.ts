@@ -21,8 +21,8 @@ const ALLOWED = new Set(['GET', 'POST', 'PUT', 'DELETE']);
 
 function employee(fields: Row): Row {
   return {
-    emp_id: '101', emp_otp: '', emp_companyname: 'Fixture Corp', emp_name: 'Harsha', emp_lname: 'Verma',
-    emp_companyid: '', emp_email: 'harsha@fixturecorp.com', emp_password: 'e10adc3949ba59abbe56e057f20f883e',
+    emp_id: '101', emp_otp: '', emp_companyname: 'Fixture Corp', emp_name: 'Test', emp_lname: 'User',
+    emp_companyid: '', emp_email: 'employee.one@fixturecorp.com', emp_password: 'e10adc3949ba59abbe56e057f20f883e',
     emp_mobile: '9876543210', emp_age: '', emp_option: 'Corporate', emp_organisationname: '', status: 'Active',
     ...fields,
   };
@@ -55,7 +55,7 @@ function createWorld(opts: { sms?: string | null; consoleFallback?: boolean; pos
   const db: Record<string, Row[]> = {
     employee_list: [
       employee({}),
-      employee({ emp_id: '102', emp_mobile: '91-9812345678', emp_name: 'Priya', emp_option: 'Individual' }),
+      employee({ emp_id: '102', emp_mobile: '91-9812345678', emp_name: 'New', emp_option: 'Individual' }),
       employee({ emp_id: '103', emp_mobile: '9000000003', status: 'DeActive' }),
     ],
     doctor_list: [
@@ -207,7 +207,7 @@ describe('sign in (employee_list, read only)', () => {
     expect(w.sms).toHaveLength(1);
     expect(w.sms[0]).toContain('to=919876543210');
     expect(session.user).toEqual(
-      expect.objectContaining({ id: '101', firstName: 'Harsha', userType: 'corporate', mobile: '+919876543210', companyName: 'Fixture Corp' }),
+      expect.objectContaining({ id: '101', firstName: 'Test', userType: 'corporate', mobile: '+919876543210', companyName: 'Fixture Corp' }),
     );
     expect(JSON.stringify(session)).not.toMatch(/e10adc|emp_password|emp_otp/);
     expect(w.writes()).toHaveLength(0);
@@ -445,9 +445,9 @@ describe('errors', () => {
 describe('sign up (the app adds the person to employee_list)', () => {
   const details = {
     userType: 'corporate' as const,
-    firstName: '  Meera <b>',
+    firstName: '  Second <b>',
     lastName: 'Iyer',
-    email: 'Meera@Fixture.com',
+    email: 'Second.User@Fixture.com',
     mobile: '+919000011111',
     companyName: 'Fixture Corp',
     employeeId: 'FC-7',
@@ -465,9 +465,9 @@ describe('sign up (the app adds the person to employee_list)', () => {
     expect(posts).toHaveLength(1);
     expect(posts[0]).toMatchObject({ method: 'POST', path: 'employee_list' });
     expect(posts[0].body).toMatchObject({
-      emp_name: 'Meera b',
+      emp_name: 'Second b',
       emp_lname: 'Iyer',
-      emp_email: 'meera@fixture.com',
+      emp_email: 'second.user@fixture.com',
       emp_mobile: '9000011111',
       emp_option: 'Corporate',
       emp_organisationname: 'Fixture Corp',
@@ -478,7 +478,7 @@ describe('sign up (the app adds the person to employee_list)', () => {
       created_at: '25-10-2026 11:30:00 AM',
     });
     expect(posts[0].body).not.toHaveProperty('emp_id');
-    expect(session.user).toMatchObject({ firstName: 'Meera b', mobile: '+919000011111', userType: 'corporate', companyName: 'Fixture Corp' });
+    expect(session.user).toMatchObject({ firstName: 'Second b', mobile: '+919000011111', userType: 'corporate', companyName: 'Fixture Corp' });
 
     // The new account works like any other: it can sign in again later.
     w.state.now += 2 * 60 * 1000;

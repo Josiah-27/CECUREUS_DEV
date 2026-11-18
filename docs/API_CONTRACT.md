@@ -90,12 +90,12 @@ Password reset is not part of Phase 1 (the app points users to support) — see 
 ```json
 {
   "id": "101",
-  "firstName": "Harsha",
-  "lastName": "Verma",
-  "email": "harsha@company.com",
-  "mobile": "+919876543210",
+  "firstName": "<first name>",
+  "lastName": "<last name or null>",
+  "email": "<email or null>",
+  "mobile": "<+91XXXXXXXXXX>",
   "userType": "corporate",
-  "companyName": "Hyundai",
+  "companyName": "<company or null>",
   "sessionsRemaining": 4,
   "age": 29
 }
@@ -120,14 +120,14 @@ Password reset is not part of Phase 1 (the app points users to support) — see 
 ```json
 {
   "id": "1",
-  "name": "Mr. Kannan Parthasarathy",
+  "name": "<doc_name>",
   "title": "Clinical Psychologist",
   "city": "Chennai",
   "experienceYears": 28,
   "languages": ["English", "Tamil"],
   "expertise": ["Anxiety Management", "Stress Management"],
   "about": "…",
-  "imageUrl": "https://eap.cecureus.com/uploads/doctor/1766122184My_Photo-Dec_25.jpeg",
+  "imageUrl": "https://eap.cecureus.com/uploads/doctor/<doct_image>",
   "rating": 4.9,
   "sessionsCount": 412,
   "modes": ["audio", "video", "chat"]
@@ -161,7 +161,7 @@ existing non-cancelled `booking_appointment` rows, minus past times. Only bookab
 {
   "id": "5001",
   "counsellorId": "1",
-  "counsellorName": "Mr. Kannan Parthasarathy",
+  "counsellorName": "<doc_name>",
   "start": "2026-11-02T10:00:00+05:30",
   "end": "2026-11-02T11:00:00+05:30",
   "mode": "video",

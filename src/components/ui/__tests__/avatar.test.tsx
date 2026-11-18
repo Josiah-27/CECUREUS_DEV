@@ -11,7 +11,7 @@ describe('Avatar', () => {
 
   it('derives initials without honorifics', () => {
     expect(initialsOf('Dr. Neha Sharma')).toBe('NS');
-    expect(initialsOf('Mr. Kannan Parthasarathy')).toBe('KP');
+    expect(initialsOf('Mr. Test Counsellor')).toBe('TC');
     expect(initialsOf('')).toBe('?');
   });
 });

@@ -62,13 +62,6 @@ export const REGISTERED_ORGANISATIONS: Record<string, { name: string; sessionsPe
   'democorp.com': { name: 'Demo Corp', sessionsPerYear: 8 },
 };
 
-/** Demo account seeded in demo mode so "I already have an account" works immediately. */
-export const DEMO_ACCOUNT = {
-  email: 'harsha.verma@example.com',
-  mobile: '+919876543210',
-  /** The mock always sends this code. */
-  otp: '123456',
-};
 
 /** Legacy DB date format seen in the dump, e.g. "25-05-2021 11:54:45 AM". */
 function dbDate(ms: number): string {
@@ -150,8 +143,6 @@ export type MockServerOptions = {
   smsFails?: boolean;
   /** API base URL the client uses; defaults to EXPO_PUBLIC_API_BASE_URL. */
   baseUrl?: string;
-  /** Pre-create the demo account (demo mode / local preview). */
-  seedDemoAccount?: boolean;
 };
 
 export type MockSnapshot = {
@@ -268,16 +259,7 @@ export function createMockServer(opts: MockServerOptions = {}) {
     return row;
   }
 
-  if (opts.seedDemoAccount) {
-    addEmployee({
-      emp_name: 'Harsha',
-      emp_lname: 'Verma',
-      emp_email: DEMO_ACCOUNT.email,
-      emp_mobile: DEMO_ACCOUNT.mobile.replace(/^\+91/, ''),
-      emp_age: '29',
-      emp_option: 'Individual',
-    });
-  }
+  // No accounts are pre-created: every account comes from the sign-up flow (no hard-coded users).
 
   function authUser(headers: Record<string, string>) {
     const token = headers.Authorization?.replace(/^Bearer /, '');

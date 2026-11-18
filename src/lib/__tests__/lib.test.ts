@@ -16,8 +16,8 @@ import {
 describe('validation', () => {
   it('validates emails', () => {
     expect(validateEmail('')).toMatch(/Enter your email/);
-    expect(validateEmail('harsha@')).toMatch(/valid/);
-    expect(validateEmail(' harsha.verma@company.co.in ')).toBeNull();
+    expect(validateEmail('user@')).toMatch(/valid/);
+    expect(validateEmail(' first.last@company.co.in ')).toBeNull();
   });
 
   it('validates and sanitises OTPs', () => {
@@ -37,8 +37,8 @@ describe('validation', () => {
   });
 
   it('validates names including non-Latin scripts', () => {
-    expect(validateName('Harsha')).toBeNull();
-    expect(validateName('ஹர்ஷா')).toBeNull();
+    expect(validateName('Test')).toBeNull();
+    expect(validateName('தமிழ்')).toBeNull();
     expect(validateName('')).toMatch(/required/);
     expect(validateName('<script>')).toMatch(/invalid/);
   });
